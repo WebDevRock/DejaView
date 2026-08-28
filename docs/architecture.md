@@ -39,25 +39,25 @@ Browser
 
 ## 2. Exact technology and libraries
 
-| Concern | Decision |
-|---|---|
-| Runtime | Node.js 22 LTS |
-| Package manager | npm, with committed `package-lock.json` |
-| Web framework | Next.js 16 App Router |
-| UI | React 19, React DOM 19, TypeScript (`strict: true`) |
-| Styling | Tailwind CSS |
-| Validation/contracts | Zod |
-| Relational access | Drizzle ORM and `drizzle-orm/better-sqlite3` |
-| SQLite driver | `better-sqlite3` |
-| Migrations | handwritten, ordered SQL files; Drizzle schema is the typed query model |
-| Full-text search | SQLite FTS5, created and maintained by handwritten SQL migrations |
-| HTTP client | Node native `fetch`; no Axios |
-| Unit/integration tests | Vitest |
-| Component tests | React Testing Library plus `@testing-library/jest-dom` and `user-event` |
-| HTTP mocking | MSW |
-| End-to-end tests | Playwright |
-| IDs | `crypto.randomUUID()` producing UUID strings stored as `TEXT` |
-| Time | ISO 8601 UTC strings (for example `2026-08-28T09:15:00.000Z`) stored as `TEXT` |
+| Concern                | Decision                                                                       |
+| ---------------------- | ------------------------------------------------------------------------------ |
+| Runtime                | Node.js 22 LTS                                                                 |
+| Package manager        | npm, with committed `package-lock.json`                                        |
+| Web framework          | Next.js 16 App Router                                                          |
+| UI                     | React 19, React DOM 19, TypeScript (`strict: true`)                            |
+| Styling                | Tailwind CSS                                                                   |
+| Validation/contracts   | Zod                                                                            |
+| Relational access      | Drizzle ORM and `drizzle-orm/better-sqlite3`                                   |
+| SQLite driver          | `better-sqlite3`                                                               |
+| Migrations             | handwritten, ordered SQL files; Drizzle schema is the typed query model        |
+| Full-text search       | SQLite FTS5, created and maintained by handwritten SQL migrations              |
+| HTTP client            | Node native `fetch`; no Axios                                                  |
+| Unit/integration tests | Vitest                                                                         |
+| Component tests        | React Testing Library plus `@testing-library/jest-dom` and `user-event`        |
+| HTTP mocking           | MSW                                                                            |
+| End-to-end tests       | Playwright                                                                     |
+| IDs                    | `crypto.randomUUID()` producing UUID strings stored as `TEXT`                  |
+| Time                   | ISO 8601 UTC strings (for example `2026-08-28T09:15:00.000Z`) stored as `TEXT` |
 
 Install current compatible releases within these fixed major/runtime decisions. Pin resolved versions in `package-lock.json`; dependency upgrades are reviewed separately.
 
@@ -147,7 +147,8 @@ All primary and foreign IDs are UUIDs represented by non-null `TEXT`. All timest
 ### Cases, provenance and feedback
 
 - `support_cases(id PK, stable_key TEXT NOT NULL UNIQUE, title TEXT NOT NULL, description TEXT NOT NULL, occurred_at TEXT NOT NULL, resolution_notes TEXT NOT NULL DEFAULT '', article_id FK knowledge_articles ON DELETE SET NULL, status TEXT NOT NULL CHECK status IN ('open','resolved','closed'), created_by_user_id FK, resolved_by_user_id FK NULL, resolved_at TEXT NULL, created_at, updated_at, CHECK resolved status and resolved fields are coherent)`.
-- `knowledge_source_links(id PK, article_id FK knowledge_articles ON DELETE CASCADE, source_kind TEXT NOT NULL CHECK source_kind IN ('support_case','external_item','manual'), support_case_id FK support_cases ON DELETE SET NULL, external_source_id FK external_sources ON DELETE SET NULL, external_item_key TEXT NULL, external_url TEXT NULL, source_title TEXT NULL, captured_at TEXT NOT NULL, snapshot_text TEXT NULL, created_at, CHECK exactly the fields required by source_kind are present)`.
+- `knowledge_source_links(id PK, article_id FK knowledge_articles ON DELETE CASCADE, source_kind TEXT NOT NULL CHECK source_kind IN ('support_case','external_item','manual'), support_case_id FK support_cases ON DELETE RESTRICT, external_source_id FK external_sources ON DELETE RESTRICT, external_item_key TEXT NULL, external_url TEXT NULL, source_title TEXT NULL, captured_at TEXT NOT NULL, snapshot_text TEXT NULL, created_at, CHECK exactly the fields required by source_kind are present)`.
+- Provenance is preserved: a referenced support case or external source cannot be deleted until its source links are deliberately removed. Support-case links contain only `support_case_id`; external-item links require source, item key and URL; manual links contain no case/source/key and require at least an external URL or source title.
 - This generic provenance record deliberately contains no Jira-specific columns.
 - `article_feedback(id PK, article_id FK knowledge_articles ON DELETE CASCADE, submitted_by_user_id FK, outcome TEXT NOT NULL CHECK outcome IN ('yes','no'), difference_note TEXT NULL, created_at)`. The difference note is always optional. Submitting **yes** transactionally inserts the feedback row, increments `knowledge_articles.use_count`, sets `last_used_at` to the submission time and refreshes `updated_at`; **no** records feedback without changing usage counters.
 
