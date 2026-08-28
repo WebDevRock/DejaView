@@ -6,6 +6,7 @@ import type {
 import type { ArticleFeedback } from "@/application/articles/article-usefulness-service";
 import type { RelatedArticle } from "@/application/articles/related-article-service";
 import { UsefulnessPanel } from "./usefulness-panel";
+import { CodeViewer } from "./code-viewer";
 
 const labels: Record<KnowledgeStep["stepType"], string> = {
   instruction: "Instruction",
@@ -79,9 +80,7 @@ export function ArticleView({
                 {step.title && <h3>{step.title}</h3>}
                 <p className="preserve-lines">{step.instruction}</p>
                 {step.code && (
-                  <pre aria-label={`${labels[step.stepType]} code`}>
-                    <code>{step.code}</code>
-                  </pre>
+                  <CodeViewer code={step.code} label={labels[step.stepType]} />
                 )}
                 {step.notes && (
                   <aside className="notes">

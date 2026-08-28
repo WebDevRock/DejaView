@@ -245,6 +245,36 @@ pre {
   font-weight: 800;
   text-transform: uppercase;
 }
+.code-viewer {
+  position: relative;
+  margin-top: 1rem;
+}
+.code-viewer pre {
+  margin: 0;
+  padding-top: 3rem;
+}
+.copy-code-button {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.65rem;
+  z-index: 1;
+  border: 1px solid #475569;
+  border-radius: 0.4rem;
+  background: #1e293b;
+  color: #e2e8f0;
+  cursor: pointer;
+  padding: 0.35rem 0.65rem;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.copy-code-button:hover {
+  background: #334155;
+}
+.copy-code-button:focus-visible {
+  outline: 3px solid #2dd4bf;
+  outline-offset: 2px;
+}
 pre {
   overflow-x: auto;
   border-radius: 0.5rem;

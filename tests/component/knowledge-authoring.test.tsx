@@ -6,9 +6,19 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 
+const originalClipboardDescriptor = Object.getOwnPropertyDescriptor(
+  navigator,
+  "clipboard",
+);
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  if (originalClipboardDescriptor) {
+    Object.defineProperty(navigator, "clipboard", originalClipboardDescriptor);
+  } else {
+    Reflect.deleteProperty(navigator, "clipboard");
+  }
 });
 
 import { ArticleEditor } from "@/app/knowledge/components/article-editor";
@@ -141,5 +151,45 @@ describe("knowledge authoring UI", () => {
     expect(screen.getByText("SQL")).toBeInTheDocument();
     expect(screen.getByText("Payroll")).toBeInTheDocument();
     expect(screen.getByText("Database")).toBeInTheDocument();
+  });
+
+  it("copies step code and confirms success", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    render(<ArticleView article={article} />);
+
+    await user.click(screen.getByRole("button", { name: "Copy SQL code" }));
+
+    expect(writeText).toHaveBeenCalledWith("SELECT 1;");
+    expect(
+      screen.getByRole("button", { name: "SQL code copied" }),
+    ).toHaveTextContent("Copied");
+    expect(screen.getByRole("status")).toHaveTextContent("SQL code copied");
+  });
+
+  it("reports clipboard failures accessibly", async () => {
+    const user = userEvent.setup();
+    const writeText = vi
+      .fn()
+      .mockRejectedValue(new Error("Clipboard unavailable"));
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    render(<ArticleView article={article} />);
+
+    await user.click(screen.getByRole("button", { name: "Copy SQL code" }));
+
+    expect(writeText).toHaveBeenCalledWith("SELECT 1;");
+    expect(
+      screen.getByRole("button", { name: "Copy SQL code failed" }),
+    ).toHaveTextContent("Copy failed");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Could not copy SQL code",
+    );
   });
 });
