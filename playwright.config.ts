@@ -6,6 +6,7 @@ export default defineConfig({
   use: { baseURL: "http://127.0.0.1:3000", trace: "on-first-retry" },
   webServer: {
     command: "npm run dev",
+    env: { DEJAVIEW_LOCAL_AUTH: "true" },
     url: "http://127.0.0.1:3000/api/v1/health",
     reuseExistingServer: !process.env.CI,
   },
