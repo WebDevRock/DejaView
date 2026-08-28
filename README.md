@@ -199,4 +199,4 @@ The MVP deliberately does **not** include:
 
 ## Licence
 
-**Placeholder — no licence has been selected.** Add an approved licence and corresponding file before distributing the project; this section intentionally does not choose one.
+DejaView is released under the [MIT License](LICENSE).
