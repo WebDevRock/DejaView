@@ -76,18 +76,18 @@ describe("sample seed", () => {
         id: SAMPLE_IDS.article,
         stable_key: "KB-EXAMPLE-001",
         title: "Resolve printer error E42",
-        summary: "Deterministic sample article",
-        problem: "Printer cannot start a job",
+        summary: "Restore printing after a connection failure",
+        problem: "A desktop printer cannot start a job",
         symptoms: "Error E42 appears on the display",
         resolution_summary: "Replace the damaged USB cable",
-        status: "draft",
+        status: "published",
         version: 1,
-        use_count: 0,
-        last_used_at: null,
+        use_count: 2,
+        last_used_at: sampleTime,
         created_by_user_id: SAMPLE_IDS.user,
         updated_by_user_id: SAMPLE_IDS.user,
-        published_by_user_id: null,
-        published_at: null,
+        published_by_user_id: SAMPLE_IDS.user,
+        published_at: sampleTime,
         created_at: sampleTime,
         updated_at: sampleTime,
       },
@@ -113,6 +113,29 @@ describe("sample seed", () => {
           ],
         }),
         body_plain_text: "Replace the damaged USB cable.",
+        created_at: sampleTime,
+        updated_at: sampleTime,
+      },
+    ]);
+    expect(
+      connection.sqlite.prepare("SELECT * FROM support_cases").all(),
+    ).toEqual([
+      {
+        id: SAMPLE_IDS.supportCase,
+        stable_key: "CASE-EXAMPLE-001",
+        title: "Printer stopped with error E42",
+        description:
+          "A desktop printer stopped accepting jobs and displayed error E42.",
+        occurred_at: sampleTime,
+        resolution_notes:
+          "A damaged USB cable was replaced and a test page printed successfully.",
+        what_was_tried: "",
+        article_id: SAMPLE_IDS.article,
+        status: "resolved",
+        version: 1,
+        created_by_user_id: SAMPLE_IDS.user,
+        resolved_by_user_id: SAMPLE_IDS.user,
+        resolved_at: sampleTime,
         created_at: sampleTime,
         updated_at: sampleTime,
       },
@@ -144,9 +167,20 @@ describe("sample seed", () => {
         entity_id: SAMPLE_IDS.article,
         source_label: "Knowledge",
         title: "Resolve printer error E42",
-        body: "Replace the damaged USB cable.",
+        body: "A desktop printer cannot start a job. Error E42 appears on the display. Replace the damaged USB cable.",
         exact_terms: "E42",
-        status: "draft",
+        status: "published",
+        updated_at: sampleTime,
+      },
+      {
+        id: SAMPLE_IDS.caseSearchDocument,
+        entity_type: "support_case",
+        entity_id: SAMPLE_IDS.supportCase,
+        source_label: "Support case",
+        title: "Printer stopped with error E42",
+        body: "A desktop printer stopped accepting jobs and displayed error E42. A damaged USB cable was replaced and a test page printed successfully.",
+        exact_terms: "E42",
+        status: "resolved",
         updated_at: sampleTime,
       },
     ]);
@@ -156,7 +190,7 @@ describe("sample seed", () => {
           "SELECT COUNT(*) AS count FROM search_documents_fts WHERE search_documents_fts MATCH 'E42'",
         )
         .get(),
-    ).toEqual({ count: 1 });
+    ).toEqual({ count: 2 });
   });
 
   it("restores exact demo values after reruns and drift", () => {
@@ -195,7 +229,7 @@ describe("sample seed", () => {
         .get(SAMPLE_IDS.article),
     ).toEqual({
       title: "Resolve printer error E42",
-      use_count: 0,
+      use_count: 2,
     });
     expect(
       connection.sqlite
@@ -220,7 +254,7 @@ describe("sample seed", () => {
           "SELECT COUNT(*) AS count FROM search_documents_fts WHERE search_documents_fts MATCH 'E42'",
         )
         .get(),
-    ).toEqual({ count: 1 });
+    ).toEqual({ count: 2 });
   });
 
   it.each([
@@ -265,9 +299,9 @@ describe("sample seed", () => {
           entity_id: SAMPLE_IDS.article,
           source_label: "Knowledge",
           title: "Resolve printer error E42",
-          body: "Replace the damaged USB cable.",
+          body: "A desktop printer cannot start a job. Error E42 appears on the display. Replace the damaged USB cable.",
           exact_terms: "E42",
-          status: "draft",
+          status: "published",
           updated_at: sampleTime,
         },
       ]);
@@ -290,7 +324,7 @@ describe("sample seed", () => {
             "SELECT COUNT(*) AS count FROM search_documents_fts WHERE search_documents_fts MATCH 'E42'",
           )
           .get(),
-      ).toEqual({ count: 1 });
+      ).toEqual({ count: 2 });
     },
   );
 
