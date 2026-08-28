@@ -95,7 +95,7 @@ export class JiraCloudProvider implements KnowledgeSourceProvider {
     });
     const payload = parsePayload(
       searchPayloadSchema,
-      await this.request(`/rest/api/3/search?${params}`, query.signal),
+      await this.request(`/rest/api/3/search/jql?${params}`, query.signal),
     );
     if (payload.issues.length > Math.min(50, Math.max(1, query.limit)))
       throw new ProviderError("unsafe_response", false);

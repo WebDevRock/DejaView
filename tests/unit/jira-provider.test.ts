@@ -254,6 +254,9 @@ describe("Jira Cloud provider", () => {
       displayStatus: "Awaiting triage",
     });
     expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(String(fetcher.mock.calls[0]![0])).toContain(
+      "/rest/api/3/search/jql?",
+    );
     expect(String(fetcher.mock.calls[0]![0])).not.toContain("comment");
     await provider.getItem("SUP-1");
     expect(fetcher).toHaveBeenCalledTimes(2);
