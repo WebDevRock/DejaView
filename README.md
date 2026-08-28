@@ -28,7 +28,7 @@ See [`docs/architecture.md`](docs/architecture.md) for the baseline decisions an
 
 ## Prerequisites
 
-- Node.js 22.x (the supported engine is `>=22 <23`)
+- Node.js 24 or later (Node.js 24 LTS and Node.js 26 are tested; `.nvmrc` selects Node.js 26)
 - npm 11 or later
 - A writable directory for the SQLite database and its WAL/SHM files
 - Optional: Jira Cloud credentials for live provider verification

@@ -41,7 +41,7 @@ Browser
 
 | Concern                | Decision                                                                       |
 | ---------------------- | ------------------------------------------------------------------------------ |
-| Runtime                | Node.js 22 LTS                                                                 |
+| Runtime                | Node.js 24 LTS or later; Node.js 24 and 26 are tested                          |
 | Package manager        | npm, with committed `package-lock.json`                                        |
 | Web framework          | Next.js 16 App Router                                                          |
 | UI                     | React 19, React DOM 19, TypeScript (`strict: true`)                            |
@@ -282,7 +282,7 @@ JSON responses use `{ data, meta }`; errors use `{ error: { code, message, field
 
 Each stage must leave tests green and the application runnable; do not build provider features before internal end-to-end search works.
 
-1. **Scaffold:** create Next.js 16/React 19/TypeScript project with npm, Node 22 engine, Tailwind, strict TypeScript, formatting/linting, Vitest/RTL/MSW and Playwright. Add import-boundary enforcement and a health page/test.
+1. **Scaffold:** create Next.js 16/React 19/TypeScript project with npm, a Node.js 24+ engine and Node.js 24/26 CI coverage, Tailwind, strict TypeScript, formatting/linting, Vitest/RTL/MSW and Playwright. Add import-boundary enforcement and a health page/test.
 2. **Persistence foundation:** add `better-sqlite3`, Drizzle typed schema, connection pragmas, checksum migration runner and the handwritten initial/FTS5 SQL migrations. Test migrations on a fresh database and upgrade path.
 3. **Domain/application core:** implement actor context, articles, stable steps/edges, applications, tags, support cases, provenance and feedback ports/use-cases. Unit-test invariants without Next.js or SQLite.
 4. **SQLite adapters:** implement repositories, transactions and search projection writes. Integration-test constraints, rollback, cascade behaviour, UUID/time round-trips and FTS trigger consistency.
