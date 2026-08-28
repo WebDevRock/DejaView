@@ -58,3 +58,18 @@ export async function resolveMutationActor(
     throw new AuthorisationError("forbidden", "Editor access is required", 403);
   return actor;
 }
+
+export async function resolveFeedbackActor(
+  request: Request,
+  provider: IdentityProvider = localIdentityProvider,
+): Promise<ActorIdentity> {
+  enforceSameOrigin(request);
+  const actor = await provider.resolve(request);
+  if (!actor)
+    throw new AuthorisationError(
+      "unauthenticated",
+      "Authentication is required",
+      401,
+    );
+  return actor;
+}

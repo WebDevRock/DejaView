@@ -1,58 +1,78 @@
 import "server-only";
-
 import path from "node:path";
 import { eq } from "drizzle-orm";
 import { KnowledgeService } from "../application/articles/knowledge-service";
+import { ArticleUsefulnessService } from "../application/articles/article-usefulness-service";
+import { RelatedArticleService } from "../application/articles/related-article-service";
+import { SupportCaseService } from "../application/cases/support-case-service";
 import { localActor } from "../app/auth/local-actor";
 import {
   openDatabase,
   type DatabaseConnection,
 } from "../infrastructure/db/client";
 import { SqliteKnowledgeArticleRepository } from "../infrastructure/db/knowledge-article-repository";
+import { SqliteSupportCaseRepository } from "../infrastructure/db/support-case-repository";
 import { runMigrations } from "../infrastructure/db/migrator";
 import { users } from "../infrastructure/db/schema";
 
 let connection: DatabaseConnection | undefined;
-let service: KnowledgeService | undefined;
-
-function ensureLocalActor(database: DatabaseConnection): void {
-  const actor = localActor();
-  if (!actor) return;
-  const existing = database.db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.id, actor.id))
-    .get();
-  if (existing) return;
-  const now = new Date().toISOString();
-  database.db
-    .insert(users)
-    .values({
-      id: actor.id,
-      externalSubject: "local-development-user",
-      displayName: actor.displayName,
-      email: "local@dejaview.invalid",
-      status: "active",
-      createdAt: now,
-      updatedAt: now,
-    })
-    .returning({ id: users.id })
-    .get();
-}
-
-export function knowledgeService(): KnowledgeService {
-  if (service) return service;
+let knowledge: KnowledgeService | undefined;
+let cases: SupportCaseService | undefined;
+let usefulness: ArticleUsefulnessService | undefined;
+let related: RelatedArticleService | undefined;
+function database() {
+  if (connection) return connection;
   connection = openDatabase();
   runMigrations(connection.sqlite, path.resolve(process.cwd(), "migrations"));
-  ensureLocalActor(connection);
-  service = new KnowledgeService(
-    new SqliteKnowledgeArticleRepository(connection),
-  );
-  return service;
+  const actor = localActor();
+  if (
+    actor &&
+    !connection.db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.id, actor.id))
+      .get()
+  ) {
+    const now = new Date().toISOString();
+    connection.db
+      .insert(users)
+      .values({
+        id: actor.id,
+        externalSubject: "local-development-user",
+        displayName: actor.displayName,
+        email: "local@dejaview.invalid",
+        status: "active",
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+  }
+  return connection;
 }
-
+function articleRepository() {
+  return new SqliteKnowledgeArticleRepository(database());
+}
+export function knowledgeService() {
+  return (knowledge ??= new KnowledgeService(articleRepository()));
+}
+export function supportCaseService() {
+  return (cases ??= new SupportCaseService(
+    new SqliteSupportCaseRepository(database()),
+    undefined,
+    knowledgeService(),
+  ));
+}
+export function articleUsefulnessService() {
+  return (usefulness ??= new ArticleUsefulnessService(articleRepository()));
+}
+export function relatedArticleService() {
+  return (related ??= new RelatedArticleService(articleRepository()));
+}
 export function resetComposition(): void {
   connection?.close();
   connection = undefined;
-  service = undefined;
+  knowledge = undefined;
+  cases = undefined;
+  usefulness = undefined;
+  related = undefined;
 }

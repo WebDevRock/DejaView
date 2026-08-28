@@ -46,7 +46,12 @@ describe("checksum migrations", () => {
 
     const result = runMigrations(connection.sqlite, projectMigrations);
 
-    expect(result.applied).toEqual(["0001_initial.sql", "0002_search_fts.sql"]);
+    expect(result.applied).toEqual([
+      "0001_initial.sql",
+      "0002_search_fts.sql",
+      "0003_support_case_details.sql",
+      "0004_support_case_version.sql",
+    ]);
     const tables = connection.sqlite
       .prepare("SELECT name FROM sqlite_master WHERE type IN ('table', 'view')")
       .all()
@@ -109,6 +114,36 @@ describe("checksum migrations", () => {
       "0002_search_fts.sql",
     ]);
     expect(runMigrations(connection.sqlite, migrations).applied).toEqual([]);
+  });
+
+  it("upgrades an existing 0002 database through immutable 0003 and 0004", () => {
+    const migrations = temporaryDirectory();
+    copyMigration("0001_initial.sql", migrations);
+    copyMigration("0002_search_fts.sql", migrations);
+    const connection = database();
+    runMigrations(connection.sqlite, migrations);
+    const before = fs.readFileSync(
+      path.join(projectMigrations, "0003_support_case_details.sql"),
+      "utf8",
+    );
+    copyMigration("0003_support_case_details.sql", migrations);
+    copyMigration("0004_support_case_version.sql", migrations);
+    expect(runMigrations(connection.sqlite, migrations).applied).toEqual([
+      "0003_support_case_details.sql",
+      "0004_support_case_version.sql",
+    ]);
+    expect(
+      connection.sqlite
+        .prepare("PRAGMA table_info(support_cases)")
+        .all()
+        .map((column) => (column as { name: string }).name),
+    ).toEqual(expect.arrayContaining(["what_was_tried", "version"]));
+    expect(
+      fs.readFileSync(
+        path.join(projectMigrations, "0003_support_case_details.sql"),
+        "utf8",
+      ),
+    ).toBe(before);
   });
 
   it("rejects an applied migration whose checksum has changed", () => {

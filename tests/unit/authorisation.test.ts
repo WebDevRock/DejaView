@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   AuthorisationError,
+  resolveFeedbackActor,
   resolveMutationActor,
   type IdentityProvider,
 } from "@/app/auth/authorisation";
@@ -16,6 +17,35 @@ afterEach(() => {
 });
 
 describe("mutation authorisation", () => {
+  it("allows an authenticated reader to submit same-origin feedback", async () => {
+    const provider: IdentityProvider = {
+      resolve: async () => ({
+        id: "00000000-0000-4000-8000-000000000002",
+        displayName: "Reader",
+        role: "viewer",
+      }),
+    };
+    await expect(
+      resolveFeedbackActor(request, provider),
+    ).resolves.toMatchObject({
+      role: "viewer",
+    });
+  });
+
+  it("still rejects missing identity and cross-origin feedback", async () => {
+    await expect(
+      resolveFeedbackActor(request, { resolve: async () => null }),
+    ).rejects.toMatchObject({ code: "unauthenticated", status: 401 });
+    await expect(
+      resolveFeedbackActor(
+        new Request(request.url, {
+          method: "POST",
+          headers: { origin: "https://attacker.example" },
+        }),
+        { resolve: async () => null },
+      ),
+    ).rejects.toMatchObject({ code: "cross_origin", status: 403 });
+  });
   it("uses the forwarded browser-facing origin behind the application server", async () => {
     const provider: IdentityProvider = {
       resolve: async () => ({

@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function HomePage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl items-center px-6 py-16">
@@ -16,6 +18,10 @@ export default function HomePage() {
           The local-first support knowledge capture and federated search
           foundation is ready.
         </p>
+        <nav className="mt-8 flex gap-4">
+          <Link href="/cases">Support cases</Link>
+          <Link href="/knowledge/new">New knowledge article</Link>
+        </nav>
       </section>
     </main>
   );

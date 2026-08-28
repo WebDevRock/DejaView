@@ -2,6 +2,7 @@ import "server-only";
 
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import type { KnowledgeArticleRepository } from "../../application/articles/knowledge-service";
+import type { ArticleFeedback } from "../../application/articles/article-usefulness-service";
 import type {
   ArticleStatus,
   KnowledgeArticle,
@@ -14,6 +15,7 @@ import type { DatabaseConnection } from "./client";
 import {
   applications,
   articleApplications,
+  articleFeedback,
   articleTags,
   knowledgeArticles,
   knowledgeSteps,
@@ -180,6 +182,40 @@ export class SqliteKnowledgeArticleRepository implements KnowledgeArticleReposit
       return true;
     })();
     return changed ? this.required(article.id) : null;
+  }
+
+  recordFeedback(feedback: ArticleFeedback): KnowledgeArticle {
+    this.connection.sqlite.transaction(() => {
+      this.connection.db.insert(articleFeedback).values(feedback).run();
+      if (feedback.outcome === "yes") {
+        const current = this.connection.db
+          .select({ useCount: knowledgeArticles.useCount })
+          .from(knowledgeArticles)
+          .where(eq(knowledgeArticles.id, feedback.articleId))
+          .get();
+        if (!current)
+          throw new Error("Article not found while recording feedback");
+        this.connection.db
+          .update(knowledgeArticles)
+          .set({
+            useCount: current.useCount + 1,
+            lastUsedAt: feedback.createdAt,
+            updatedAt: feedback.createdAt,
+          })
+          .where(eq(knowledgeArticles.id, feedback.articleId))
+          .run();
+      }
+    })();
+    return this.required(feedback.articleId);
+  }
+
+  feedbackHistory(articleId: string): ArticleFeedback[] {
+    return this.connection.db
+      .select()
+      .from(articleFeedback)
+      .where(eq(articleFeedback.articleId, articleId))
+      .orderBy(desc(articleFeedback.createdAt), desc(articleFeedback.id))
+      .all();
   }
 
   private required(id: string): KnowledgeArticle {

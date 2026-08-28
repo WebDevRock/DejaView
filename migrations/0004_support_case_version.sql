@@ -1,0 +1,1 @@
+ALTER TABLE support_cases ADD COLUMN version INTEGER NOT NULL DEFAULT 1;

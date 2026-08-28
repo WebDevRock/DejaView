@@ -189,11 +189,13 @@ export const supportCases = sqliteTable(
     title: text("title").notNull(),
     description: text("description").notNull(),
     occurredAt: text("occurred_at").notNull(),
+    whatWasTried: text("what_was_tried").notNull().default(""),
     resolutionNotes: text("resolution_notes").notNull().default(""),
     articleId: text("article_id").references(() => knowledgeArticles.id, {
       onDelete: "set null",
     }),
     status: text("status", { enum: ["open", "resolved", "closed"] }).notNull(),
+    version: integer("version").notNull().default(1),
     createdByUserId: text("created_by_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),

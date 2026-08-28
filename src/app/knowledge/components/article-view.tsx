@@ -3,6 +3,9 @@ import type {
   KnowledgeArticle,
   KnowledgeStep,
 } from "@/domain/knowledge/article";
+import type { ArticleFeedback } from "@/application/articles/article-usefulness-service";
+import type { RelatedArticle } from "@/application/articles/related-article-service";
+import { UsefulnessPanel } from "./usefulness-panel";
 
 const labels: Record<KnowledgeStep["stepType"], string> = {
   instruction: "Instruction",
@@ -16,7 +19,15 @@ const labels: Record<KnowledgeStep["stepType"], string> = {
   expected_result: "Expected result",
 };
 
-export function ArticleView({ article }: { article: KnowledgeArticle }) {
+export function ArticleView({
+  article,
+  feedback = [],
+  related = [],
+}: {
+  article: KnowledgeArticle;
+  feedback?: ArticleFeedback[];
+  related?: RelatedArticle[];
+}) {
   return (
     <main className="page-shell">
       <nav className="top-nav">
@@ -119,6 +130,29 @@ export function ArticleView({ article }: { article: KnowledgeArticle }) {
             </div>
           </div>
         </footer>
+        <UsefulnessPanel
+          articleId={article.id}
+          useCount={article.useCount}
+          lastUsedAt={article.lastUsedAt}
+          history={feedback}
+        />
+        <section>
+          <h2>Related articles</h2>
+          {related.length ? (
+            <ul>
+              {related.map((item) => (
+                <li key={item.article.id}>
+                  <Link href={`/knowledge/${item.article.id}`}>
+                    {item.article.title}
+                  </Link>{" "}
+                  — {item.reasons.join("; ")}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No related published articles found.</p>
+          )}
+        </section>
       </article>
     </main>
   );

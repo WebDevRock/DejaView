@@ -1,5 +1,9 @@
 import { notFound } from "next/navigation";
-import { knowledgeService } from "@/composition/root";
+import {
+  articleUsefulnessService,
+  knowledgeService,
+  relatedArticleService,
+} from "@/composition/root";
 import { KnowledgeArticleError } from "@/domain/knowledge/article";
 import { ArticleView } from "../components/article-view";
 
@@ -17,5 +21,11 @@ export default async function KnowledgeArticlePage({
       notFound();
     throw error;
   }
-  return <ArticleView article={article} />;
+  return (
+    <ArticleView
+      article={article}
+      feedback={articleUsefulnessService().history(article.id)}
+      related={relatedArticleService().forArticle(article.id)}
+    />
+  );
 }
