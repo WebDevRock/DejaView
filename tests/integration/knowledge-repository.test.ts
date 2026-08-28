@@ -10,6 +10,7 @@ import {
 } from "@/infrastructure/db/client";
 import { runMigrations } from "@/infrastructure/db/migrator";
 import { SqliteKnowledgeArticleRepository } from "@/infrastructure/db/knowledge-article-repository";
+import { repairSearchProjection } from "@/infrastructure/search/projection-repair";
 
 const actor = {
   id: "00000000-0000-4000-8000-000000000001",
@@ -160,7 +161,7 @@ describe("SQLite knowledge repository", () => {
     ).toEqual({
       title: "Repair payroll export",
       status: "draft",
-      body: expect.stringContaining("Invoke-Sqlcmd"),
+      body: expect.stringMatching(/Invoke-Sqlcmd[\s\S]*Reporting[\s\S]*Export/),
       exact_terms: expect.stringContaining("SQLSTATE 42P01"),
     });
     expect(
@@ -170,6 +171,56 @@ describe("SQLite knowledge repository", () => {
         )
         .get(),
     ).toEqual({ count: 1 });
+  });
+
+  it("writes the identical complete article projection before and after repair", () => {
+    const { connection, service } = fixture();
+    const article = service.quickCreate(
+      {
+        problem: "Payroll export fails",
+        symptomsOrError: "SQLSTATE 42P01",
+        whatFixedIt: "Restore the reporting view with Invoke-Sqlcmd",
+        applications: ["Payroll"],
+        tags: ["Database"],
+      },
+      actor,
+    );
+    service.update(
+      article.id,
+      {
+        version: article.version,
+        title: article.title,
+        summary: article.summary,
+        problem: article.problem,
+        symptoms: article.symptoms,
+        resolutionSummary: article.resolutionSummary,
+        steps: [
+          {
+            ...article.steps[0]!,
+            instruction: "Distinct repair instruction",
+            code: "DISTINCT_REPAIR_CODE();",
+            notes: null,
+          },
+        ],
+        edges: [],
+        applications: article.applications.map((item) => item.name),
+        tags: article.tags.map((item) => item.name),
+      },
+      actor,
+    );
+    const readProjection = () =>
+      connection.sqlite
+        .prepare("SELECT * FROM search_documents WHERE entity_id = ?")
+        .get(article.id);
+    const live = readProjection();
+    expect(live).toMatchObject({
+      body: expect.stringContaining("Distinct repair instruction"),
+      exact_terms: expect.stringContaining("DISTINCT_REPAIR_CODE();"),
+    });
+
+    repairSearchProjection(connection.sqlite);
+
+    expect(readProjection()).toEqual(live);
   });
 
   it("does not partially replace children when optimistic locking fails", () => {

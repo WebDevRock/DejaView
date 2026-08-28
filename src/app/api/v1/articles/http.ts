@@ -62,7 +62,7 @@ export function errorResponse(error: unknown): NextResponse {
       { status },
     );
   }
-  console.error(`[${requestId}] Unexpected article route error`, error);
+  console.error(`[${requestId}] Unexpected API route error`, error);
   return NextResponse.json(
     {
       error: {

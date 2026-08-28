@@ -204,9 +204,8 @@ export function seedSampleData(database: BetterSqlite3.Database): void {
         (id, entity_type, entity_id, source_label, title, body, exact_terms, status, updated_at)
         VALUES (?, 'article', ?, 'Knowledge', 'Resolve printer error E42',
           'Replace the damaged USB cable.', 'E42', 'draft', ?)
-        ON CONFLICT(id) DO UPDATE SET
-          entity_type = excluded.entity_type,
-          entity_id = excluded.entity_id,
+        ON CONFLICT(entity_type, entity_id) DO UPDATE SET
+          id = excluded.id,
           source_label = excluded.source_label,
           title = excluded.title,
           body = excluded.body,

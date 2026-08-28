@@ -19,7 +19,8 @@
     "test:watch": "vitest --sequence.concurrent=false",
     "test:e2e": "playwright test",
     "db:migrate": "tsx scripts/migrate.ts",
-    "db:seed": "tsx scripts/seed.ts"
+    "db:seed": "tsx scripts/seed.ts",
+    "search:reindex": "tsx scripts/reindex-search.ts"
   },
   "dependencies": {
     "better-sqlite3": "^12.4.1",

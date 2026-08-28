@@ -118,6 +118,9 @@ describe("support cases and article usefulness", () => {
     connection.sqlite
       .prepare("UPDATE knowledge_articles SET updated_at=? WHERE id=?")
       .run("2026-08-27T00:00:00.000Z", article.id);
+    connection.sqlite
+      .prepare("UPDATE search_documents SET updated_at=? WHERE entity_id=?")
+      .run("2026-08-27T00:00:00.000Z", article.id);
     usefulness.record(article.id, { outcome: "yes" }, actor);
     expect(articles.get(article.id)).toMatchObject({
       useCount: 1,
@@ -125,6 +128,11 @@ describe("support cases and article usefulness", () => {
       updatedAt: "2026-08-28T15:00:00.000Z",
     });
     expect(usefulness.history(article.id)).toHaveLength(2);
+    expect(
+      connection.sqlite
+        .prepare("SELECT updated_at FROM search_documents WHERE entity_id=?")
+        .get(article.id),
+    ).toEqual({ updated_at: "2026-08-28T15:00:00.000Z" });
     expect(
       connection.sqlite
         .prepare("SELECT count(*) count FROM article_feedback")

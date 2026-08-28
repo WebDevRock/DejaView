@@ -204,6 +204,16 @@ export class SqliteKnowledgeArticleRepository implements KnowledgeArticleReposit
           })
           .where(eq(knowledgeArticles.id, feedback.articleId))
           .run();
+        this.connection.db
+          .update(searchDocuments)
+          .set({ updatedAt: feedback.createdAt })
+          .where(
+            and(
+              eq(searchDocuments.entityType, "article"),
+              eq(searchDocuments.entityId, feedback.articleId),
+            ),
+          )
+          .run();
       }
     })();
     return this.required(feedback.articleId);
@@ -359,9 +369,16 @@ export class SqliteKnowledgeArticleRepository implements KnowledgeArticleReposit
       article.resolutionSummary,
       ...article.steps.flatMap((step) => [
         step.title ?? "",
+        step.instruction,
         step.bodyPlainText,
+        step.code ?? "",
         step.notes ?? "",
       ]),
+      ...article.applications.flatMap((application) => [
+        application.name,
+        application.key,
+      ]),
+      ...article.tags.flatMap((tag) => [tag.name, tag.slug]),
     ]
       .filter(Boolean)
       .join("\n");

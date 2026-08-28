@@ -9,6 +9,8 @@ import {
 } from "@/infrastructure/db/client";
 import { runMigrations } from "@/infrastructure/db/migrator";
 import { SAMPLE_IDS, seedSampleData } from "@/infrastructure/db/seed";
+import { repairSearchProjection } from "@/infrastructure/search/projection-repair";
+import { seedSampleData as seedSampleDataCli } from "../../scripts/scripts-safe/seed";
 
 const connections: DatabaseConnection[] = [];
 const directories: string[] = [];
@@ -220,6 +222,77 @@ describe("sample seed", () => {
         .get(),
     ).toEqual({ count: 1 });
   });
+
+  it.each([
+    ["runtime to runtime", seedSampleData, seedSampleData],
+    ["runtime to CLI-safe", seedSampleData, seedSampleDataCli],
+    ["CLI-safe to runtime", seedSampleDataCli, seedSampleData],
+    ["CLI-safe to CLI-safe", seedSampleDataCli, seedSampleDataCli],
+  ])(
+    "restores the exact deterministic projection after reindex (%s)",
+    (_name, initialSeed, rerunSeed) => {
+      const connection = database();
+      initialSeed(connection.sqlite);
+      connection.sqlite
+        .prepare(
+          `INSERT INTO users
+          (id, external_subject, display_name, email, status, created_at, updated_at)
+          VALUES ('unrelated-user', 'unrelated', 'Unrelated User', 'user@example.invalid', 'active', ?, ?)`,
+        )
+        .run(sampleTime, sampleTime);
+
+      repairSearchProjection(connection.sqlite);
+      expect(
+        connection.sqlite
+          .prepare(
+            "SELECT id FROM search_documents WHERE entity_type = 'article' AND entity_id = ?",
+          )
+          .get(SAMPLE_IDS.article),
+      ).toEqual({ id: `article:${SAMPLE_IDS.article}` });
+
+      rerunSeed(connection.sqlite);
+
+      expect(
+        connection.sqlite
+          .prepare(
+            "SELECT * FROM search_documents WHERE entity_type = 'article' AND entity_id = ?",
+          )
+          .all(SAMPLE_IDS.article),
+      ).toEqual([
+        {
+          id: SAMPLE_IDS.searchDocument,
+          entity_type: "article",
+          entity_id: SAMPLE_IDS.article,
+          source_label: "Knowledge",
+          title: "Resolve printer error E42",
+          body: "Replace the damaged USB cable.",
+          exact_terms: "E42",
+          status: "draft",
+          updated_at: sampleTime,
+        },
+      ]);
+      expect(
+        connection.sqlite
+          .prepare("SELECT * FROM users WHERE id = 'unrelated-user'")
+          .get(),
+      ).toEqual({
+        id: "unrelated-user",
+        external_subject: "unrelated",
+        display_name: "Unrelated User",
+        email: "user@example.invalid",
+        status: "active",
+        created_at: sampleTime,
+        updated_at: sampleTime,
+      });
+      expect(
+        connection.sqlite
+          .prepare(
+            "SELECT COUNT(*) AS count FROM search_documents_fts WHERE search_documents_fts MATCH 'E42'",
+          )
+          .get(),
+      ).toEqual({ count: 1 });
+    },
+  );
 
   it("rejects a conflicting natural key atomically", () => {
     const connection = database();

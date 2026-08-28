@@ -5,6 +5,7 @@ import { KnowledgeService } from "../application/articles/knowledge-service";
 import { ArticleUsefulnessService } from "../application/articles/article-usefulness-service";
 import { RelatedArticleService } from "../application/articles/related-article-service";
 import { SupportCaseService } from "../application/cases/support-case-service";
+import { SearchService } from "../application/search/search-service";
 import { localActor } from "../app/auth/local-actor";
 import {
   openDatabase,
@@ -13,6 +14,7 @@ import {
 import { SqliteKnowledgeArticleRepository } from "../infrastructure/db/knowledge-article-repository";
 import { SqliteSupportCaseRepository } from "../infrastructure/db/support-case-repository";
 import { runMigrations } from "../infrastructure/db/migrator";
+import { SqliteFts5SearchRepository } from "../infrastructure/search/fts5-search-repository";
 import { users } from "../infrastructure/db/schema";
 
 let connection: DatabaseConnection | undefined;
@@ -20,6 +22,7 @@ let knowledge: KnowledgeService | undefined;
 let cases: SupportCaseService | undefined;
 let usefulness: ArticleUsefulnessService | undefined;
 let related: RelatedArticleService | undefined;
+let search: SearchService | undefined;
 function database() {
   if (connection) return connection;
   connection = openDatabase();
@@ -68,6 +71,11 @@ export function articleUsefulnessService() {
 export function relatedArticleService() {
   return (related ??= new RelatedArticleService(articleRepository()));
 }
+export function searchService() {
+  return (search ??= new SearchService(
+    new SqliteFts5SearchRepository(database()),
+  ));
+}
 export function resetComposition(): void {
   connection?.close();
   connection = undefined;
@@ -75,4 +83,5 @@ export function resetComposition(): void {
   cases = undefined;
   usefulness = undefined;
   related = undefined;
+  search = undefined;
 }
