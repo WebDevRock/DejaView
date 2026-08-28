@@ -16,6 +16,11 @@ import { SqliteSupportCaseRepository } from "../infrastructure/db/support-case-r
 import { runMigrations } from "../infrastructure/db/migrator";
 import { SqliteFts5SearchRepository } from "../infrastructure/search/fts5-search-repository";
 import { users } from "../infrastructure/db/schema";
+import { ProviderRegistry } from "../infrastructure/providers/registry";
+import { jiraConfigurationFromEnvironment } from "../infrastructure/providers/jira/config";
+import { JiraCloudProvider } from "../infrastructure/providers/jira/provider";
+import { PromoteExternalItemService } from "../application/sources/promote-external-item";
+import { SqliteExternalPromotionRepository } from "../infrastructure/db/external-promotion-repository";
 
 let connection: DatabaseConnection | undefined;
 let knowledge: KnowledgeService | undefined;
@@ -23,6 +28,23 @@ let cases: SupportCaseService | undefined;
 let usefulness: ArticleUsefulnessService | undefined;
 let related: RelatedArticleService | undefined;
 let search: SearchService | undefined;
+let providerRegistry: ProviderRegistry | undefined;
+let jiraPromotion: PromoteExternalItemService | undefined;
+export function knowledgeSourceProviders() {
+  if (providerRegistry) return providerRegistry;
+  providerRegistry = new ProviderRegistry();
+  const jira = jiraConfigurationFromEnvironment();
+  if (jira) providerRegistry.register(new JiraCloudProvider(jira));
+  return providerRegistry;
+}
+export function jiraPromotionService() {
+  const provider = knowledgeSourceProviders().get("jira");
+  if (!provider) return null;
+  return (jiraPromotion ??= new PromoteExternalItemService(
+    provider,
+    new SqliteExternalPromotionRepository(database(), knowledgeService()),
+  ));
+}
 function database() {
   if (connection) return connection;
   connection = openDatabase();
@@ -74,6 +96,7 @@ export function relatedArticleService() {
 export function searchService() {
   return (search ??= new SearchService(
     new SqliteFts5SearchRepository(database()),
+    knowledgeSourceProviders().all(),
   ));
 }
 export function resetComposition(): void {
@@ -84,4 +107,6 @@ export function resetComposition(): void {
   usefulness = undefined;
   related = undefined;
   search = undefined;
+  providerRegistry = undefined;
+  jiraPromotion = undefined;
 }

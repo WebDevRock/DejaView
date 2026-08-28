@@ -1,5 +1,5 @@
-export type SearchSource = "knowledge" | "support_case";
-export type SearchKind = "article" | "support_case";
+export type SearchSource = "knowledge" | "support_case" | "external" | string;
+export type SearchKind = "article" | "support_case" | "external";
 
 export interface SearchQuery {
   text: string;
@@ -24,7 +24,8 @@ export interface SearchResult {
   snippet: string;
   url: string;
   sourceLabel: string;
-  status: "Published" | "Resolved";
+  status: string;
+  displayStatus?: string;
   score: number;
   exactMatch: boolean;
   updatedAt: string;

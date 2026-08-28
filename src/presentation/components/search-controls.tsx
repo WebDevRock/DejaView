@@ -41,6 +41,7 @@ export function SearchControls({ values }: { values: SearchControlValues }) {
         <option value="">All sources</option>
         <option value="knowledge">Knowledge</option>
         <option value="support_case">Support cases</option>
+        <option value="external">External sources</option>
       </select>
       <select
         name="status"

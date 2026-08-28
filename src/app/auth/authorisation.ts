@@ -59,6 +59,19 @@ export async function resolveMutationActor(
   return actor;
 }
 
+export async function resolveSameOriginMutationActor(
+  request: Request,
+  provider: IdentityProvider = localIdentityProvider,
+): Promise<ActorIdentity> {
+  if (!request.headers.get("origin"))
+    throw new AuthorisationError(
+      "cross_origin",
+      "A same-origin browser request is required",
+      403,
+    );
+  return resolveMutationActor(request, provider);
+}
+
 export async function resolveFeedbackActor(
   request: Request,
   provider: IdentityProvider = localIdentityProvider,

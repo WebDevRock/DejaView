@@ -17,7 +17,9 @@ export function SearchResults({ results }: { results: SearchResult[] }) {
         >
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-emerald-700">
             <span>{result.sourceLabel}</span>
-            <span className="text-slate-400">{result.status}</span>
+            <span className="text-slate-400">
+              {result.displayStatus ?? result.status}
+            </span>
             {result.exactMatch && (
               <span className="rounded bg-amber-100 px-2 py-1 text-amber-800">
                 Exact match

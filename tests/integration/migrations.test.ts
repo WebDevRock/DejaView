@@ -51,6 +51,7 @@ describe("checksum migrations", () => {
       "0002_search_fts.sql",
       "0003_support_case_details.sql",
       "0004_support_case_version.sql",
+      "0005_unique_external_promotion.sql",
     ]);
     const tables = connection.sqlite
       .prepare("SELECT name FROM sqlite_master WHERE type IN ('table', 'view')")

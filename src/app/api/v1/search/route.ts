@@ -6,7 +6,9 @@ export const runtime = "nodejs";
 const schema = z
   .object({
     q: z.string().max(500).default(""),
-    source: z.enum(["knowledge", "support_case"]).optional(),
+    source: z
+      .enum(["knowledge", "support_case", "external", "jira"])
+      .optional(),
     application: z.string().max(100).optional(),
     tag: z.string().max(100).optional(),
     dateFrom: z.union([z.iso.date(), z.iso.datetime()]).optional(),

@@ -15,6 +15,7 @@ beforeEach(() => {
 afterEach(() => {
   resetComposition();
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
   delete process.env.DATABASE_URL;
   fs.rmSync(directory, { recursive: true, force: true });
 });
@@ -27,6 +28,44 @@ describe("GET /api/v1/search", () => {
     expect(await response.json()).toEqual({
       data: [],
       meta: { nextCursor: null, partial: false, warnings: [] },
+    });
+  });
+  it("integrates a configured Jira provider while preserving internal results on upstream failure", async () => {
+    vi.stubEnv("JIRA_BASE_URL", "https://tenant.atlassian.net");
+    vi.stubEnv("JIRA_EMAIL", "service@example.test");
+    vi.stubEnv("JIRA_API_TOKEN", "test-only-token");
+    vi.stubEnv("JIRA_PROJECT_KEYS", "SUP");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response("unavailable", { status: 503 })),
+    );
+    resetComposition();
+    await GET(new Request("http://localhost/api/v1/search?q=printer"));
+    const database = new Database(process.env.DATABASE_URL!);
+    database
+      .prepare("INSERT INTO search_documents VALUES (?,?,?,?,?,?,?,?,?)")
+      .run(
+        "article:local",
+        "article",
+        "local",
+        "Knowledge",
+        "Local printer fix",
+        "printer",
+        "printer",
+        "published",
+        "2026-08-28T00:00:00.000Z",
+      );
+    database.close();
+    const response = await GET(
+      new Request("http://localhost/api/v1/search?q=printer"),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      data: [{ id: "article:local", sourceLabel: "Knowledge" }],
+      meta: {
+        partial: true,
+        warnings: ["Jira is temporarily unavailable"],
+      },
     });
   });
   it("returns the consistent validation envelope", async () => {
@@ -83,6 +122,26 @@ describe("GET /api/v1/search", () => {
       new Request("http://localhost/api/v1/search?q=printer&dateTo=2026-02-30"),
     );
     expect(rejected.status).toBe(400);
+  });
+  it("passes an ISO UTC datetime without fractional seconds to Jira safely", async () => {
+    vi.stubEnv("JIRA_BASE_URL", "https://tenant.atlassian.net");
+    vi.stubEnv("JIRA_EMAIL", "service@example.test");
+    vi.stubEnv("JIRA_API_TOKEN", "test-only-token");
+    vi.stubEnv("JIRA_PROJECT_KEYS", "SUP");
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ issues: [] }));
+    vi.stubGlobal("fetch", fetcher);
+    resetComposition();
+
+    const response = await GET(
+      new Request(
+        "http://localhost/api/v1/search?q=printer&source=jira&dateFrom=2026-08-01T10%3A11%3A12Z",
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(
+      new URL(String(fetcher.mock.calls[0]![0])).searchParams.get("jql"),
+    ).toContain('updated >= "2026-08-01 10:11"');
   });
   it("returns 400 for malformed, tampered and cross-query cursors", async () => {
     await GET(new Request("http://localhost/api/v1/search?q=initialise"));

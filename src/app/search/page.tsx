@@ -45,6 +45,15 @@ export default async function SearchPage({
         {result.results.length} result{result.results.length === 1 ? "" : "s"}{" "}
         for “{q}”
       </p>
+      {result.partial && (
+        <div
+          role="status"
+          className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900"
+        >
+          Some knowledge sources could not be searched.{" "}
+          {result.warnings.join(" ")}
+        </div>
+      )}
       <SearchResults results={result.results} />
       {result.nextCursor && (
         <Link

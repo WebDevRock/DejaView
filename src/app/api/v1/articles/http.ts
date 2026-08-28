@@ -3,6 +3,7 @@ import { z, ZodError, type ZodType } from "zod";
 import { AuthorisationError } from "@/app/auth/authorisation";
 import { KnowledgeArticleError } from "@/domain/knowledge/article";
 import { SupportCaseError } from "@/domain/support/support-case";
+import { ProviderError } from "@/domain/sources/provider";
 
 export const dataResponse = (data: unknown, status = 200) =>
   NextResponse.json({ data, meta: {} }, { status });
@@ -59,6 +60,29 @@ export function errorResponse(error: unknown): NextResponse {
           : 400;
     return NextResponse.json(
       { error: { code: error.code, message: error.message, requestId } },
+      { status },
+    );
+  }
+  if (error instanceof ProviderError) {
+    const status =
+      error.code === "not_found"
+        ? 404
+        : error.code === "invalid_request"
+          ? 400
+          : error.code === "rate_limited"
+            ? 503
+            : error.code === "timeout"
+              ? 504
+              : 502;
+    return NextResponse.json(
+      {
+        error: {
+          code: error.code,
+          message:
+            "The external knowledge source request could not be completed",
+          requestId,
+        },
+      },
       { status },
     );
   }
