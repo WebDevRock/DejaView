@@ -85,20 +85,32 @@ export function ArticleView({
           <ol className="step-list">
             {article.steps.map((step) => (
               <li key={step.id} className={`view-step step-${step.stepType}`}>
-                <div className="step-heading">
-                  <span className="step-number">{step.position + 1}</span>
-                  <span className="step-type">{labels[step.stepType]}</span>
-                </div>
-                {step.title && <h3>{step.title}</h3>}
-                <p className="preserve-lines">{step.instruction}</p>
-                {step.code && (
-                  <CodeViewer code={step.code} label={labels[step.stepType]} />
-                )}
-                {step.notes && (
-                  <aside className="notes">
-                    <strong>Notes:</strong> {step.notes}
-                  </aside>
-                )}
+                <details>
+                  <summary className="step-heading cursor-pointer select-none">
+                    <span className="step-number">{step.position + 1}</span>
+                    <span>
+                      <strong>Step {step.position + 1}</strong>
+                      <span className="step-type ml-2">
+                        {labels[step.stepType]}
+                      </span>
+                      {step.title && <span className="ml-2">{step.title}</span>}
+                    </span>
+                  </summary>
+                  <div className="mt-4">
+                    <p className="preserve-lines">{step.instruction}</p>
+                    {step.code && (
+                      <CodeViewer
+                        code={step.code}
+                        label={labels[step.stepType]}
+                      />
+                    )}
+                    {step.notes && (
+                      <aside className="notes">
+                        <strong>Notes:</strong> {step.notes}
+                      </aside>
+                    )}
+                  </div>
+                </details>
               </li>
             ))}
           </ol>

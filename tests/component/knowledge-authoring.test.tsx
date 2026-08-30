@@ -156,10 +156,17 @@ describe("knowledge authoring UI", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders SQL and application and tag metadata", () => {
+  it("renders every step as a collapsed accessible accordion", async () => {
+    const user = userEvent.setup();
     render(<ArticleView article={article} />);
-    expect(screen.getByText("SELECT 1;")).toBeInTheDocument();
-    expect(screen.getByText("SQL")).toBeInTheDocument();
+
+    const step = screen.getByText(/Step 1/).closest("details");
+    expect(step).not.toHaveAttribute("open");
+    expect(screen.queryByText("SELECT 1;")).not.toBeVisible();
+
+    await user.click(screen.getByText(/Step 1/));
+    expect(step).toHaveAttribute("open");
+    expect(screen.getByText("SELECT 1;")).toBeVisible();
     expect(screen.getByText("Payroll")).toBeInTheDocument();
     expect(screen.getByText("Database")).toBeInTheDocument();
   });
