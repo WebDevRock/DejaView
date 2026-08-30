@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { knowledgeService } from "@/composition/root";
+import type { KnowledgeSource } from "@/domain/knowledge/article";
 
 type HomeArticle = {
   id: string;
   title: string;
   summary: string;
   useCount: number;
+  sources: KnowledgeSource[];
 };
 
 export function HomeKnowledgeCards({ articles }: { articles: HomeArticle[] }) {
@@ -31,6 +33,19 @@ export function HomeKnowledgeCards({ articles }: { articles: HomeArticle[] }) {
           <p className="mt-2 text-sm text-slate-600">
             {article.summary || "No summary provided."}
           </p>
+          {article.sources.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {article.sources.map((source, index) => (
+                <span
+                  className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700"
+                  key={`${source.kind}:${source.externalKey ?? source.capturedAt}:${index}`}
+                >
+                  {source.label}
+                  {source.externalKey ? ` · ${source.externalKey}` : ""}
+                </span>
+              ))}
+            </div>
+          )}
           <p className="mt-4 text-xs font-medium text-emerald-700">
             Used {article.useCount} {article.useCount === 1 ? "time" : "times"}
           </p>
@@ -105,11 +120,12 @@ export default function HomePage() {
         right.updatedAt.localeCompare(left.updatedAt),
     )
     .slice(0, 6)
-    .map(({ id, title, summary, useCount }) => ({
+    .map(({ id, title, summary, useCount, sources }) => ({
       id,
       title,
       summary,
       useCount,
+      sources,
     }));
   return <HomeContent articles={articles} />;
 }

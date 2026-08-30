@@ -78,6 +78,18 @@ describe("search interface", () => {
             title: "Repair payroll export",
             summary: "Restore the reporting view",
             useCount: 4,
+            sources: [
+              {
+                kind: "external",
+                providerType: "jira",
+                label: "Jira",
+                providerLabel: "Support Jira",
+                externalKey: "SUP-42",
+                externalUrl: "https://tenant.atlassian.net/browse/SUP-42",
+                sourceTitle: "Repair payroll export",
+                capturedAt: "2026-08-28T10:00:00.000Z",
+              },
+            ],
           },
         ]}
       />,
@@ -85,6 +97,7 @@ describe("search interface", () => {
     expect(
       screen.getByRole("link", { name: /Repair payroll export/ }),
     ).toHaveAttribute("href", "/knowledge/article-id");
+    expect(screen.getByText(/Jira\s*·\s*SUP-42/)).toBeInTheDocument();
     expect(screen.getByText(/Used 4 times/)).toBeInTheDocument();
 
     rerender(<HomeKnowledgeCards articles={[]} />);
