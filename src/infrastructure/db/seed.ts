@@ -9,8 +9,7 @@ export const SAMPLE_IDS = {
   article: "00000000-0000-4000-8000-000000000004",
   step: "00000000-0000-4000-8000-000000000005",
   searchDocument: "00000000-0000-4000-8000-000000000006",
-  supportCase: "00000000-0000-4000-8000-000000000007",
-  caseSearchDocument: "00000000-0000-4000-8000-000000000008",
+  sourceLink: "00000000-0000-4000-8000-000000000007",
 } as const;
 
 const SAMPLE_TIME = "2026-08-28T09:15:00.000Z";
@@ -79,13 +78,6 @@ export function seedSampleData(database: BetterSqlite3.Database): void {
       "stable_key",
       "KB-EXAMPLE-001",
       SAMPLE_IDS.article,
-    );
-    assertNaturalKeyAvailable(
-      database,
-      "support_cases",
-      "stable_key",
-      "CASE-EXAMPLE-001",
-      SAMPLE_IDS.supportCase,
     );
 
     database
@@ -172,38 +164,6 @@ export function seedSampleData(database: BetterSqlite3.Database): void {
       );
     database
       .prepare(
-        `INSERT INTO support_cases
-        (id, stable_key, title, description, occurred_at, resolution_notes, article_id, status,
-         created_by_user_id, resolved_by_user_id, resolved_at, created_at, updated_at)
-        VALUES (?, 'CASE-EXAMPLE-001', 'Printer stopped with error E42',
-          'A desktop printer stopped accepting jobs and displayed error E42.', ?,
-          'A damaged USB cable was replaced and a test page printed successfully.', ?, 'resolved', ?, ?, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET
-          stable_key = excluded.stable_key,
-          title = excluded.title,
-          description = excluded.description,
-          occurred_at = excluded.occurred_at,
-          resolution_notes = excluded.resolution_notes,
-          article_id = excluded.article_id,
-          status = excluded.status,
-          created_by_user_id = excluded.created_by_user_id,
-          resolved_by_user_id = excluded.resolved_by_user_id,
-          resolved_at = excluded.resolved_at,
-          created_at = excluded.created_at,
-          updated_at = excluded.updated_at`,
-      )
-      .run(
-        SAMPLE_IDS.supportCase,
-        SAMPLE_TIME,
-        SAMPLE_IDS.article,
-        SAMPLE_IDS.user,
-        SAMPLE_IDS.user,
-        SAMPLE_TIME,
-        SAMPLE_TIME,
-        SAMPLE_TIME,
-      );
-    database
-      .prepare(
         `INSERT INTO knowledge_steps
         (id, article_id, stable_key, position, step_type, title, instruction, code, notes,
          body_ast_json, body_plain_text, created_at, updated_at)
@@ -246,9 +206,17 @@ export function seedSampleData(database: BetterSqlite3.Database): void {
       .run(SAMPLE_IDS.article, SAMPLE_IDS.tag, SAMPLE_TIME);
     database
       .prepare(
+        `INSERT INTO knowledge_source_links
+        (id, article_id, source_kind, source_title, captured_at, created_at)
+        VALUES (?, ?, 'internal', 'Created in DejaView', ?, ?)
+        ON CONFLICT(id) DO UPDATE SET source_title = excluded.source_title`,
+      )
+      .run(SAMPLE_IDS.sourceLink, SAMPLE_IDS.article, SAMPLE_TIME, SAMPLE_TIME);
+    database
+      .prepare(
         `INSERT INTO search_documents
         (id, entity_type, entity_id, source_label, title, body, exact_terms, status, updated_at)
-        VALUES (?, 'article', ?, 'Knowledge', 'Resolve printer error E42',
+        VALUES (?, 'article', ?, 'DejaView knowledge', 'Resolve printer error E42',
           'A desktop printer cannot start a job. Error E42 appears on the display. Replace the damaged USB cable.',
           'E42', 'published', ?)
         ON CONFLICT(entity_type, entity_id) DO UPDATE SET
@@ -261,22 +229,5 @@ export function seedSampleData(database: BetterSqlite3.Database): void {
           updated_at = excluded.updated_at`,
       )
       .run(SAMPLE_IDS.searchDocument, SAMPLE_IDS.article, SAMPLE_TIME);
-    database
-      .prepare(
-        `INSERT INTO search_documents
-        (id, entity_type, entity_id, source_label, title, body, exact_terms, status, updated_at)
-        VALUES (?, 'support_case', ?, 'Support case', 'Printer stopped with error E42',
-          'A desktop printer stopped accepting jobs and displayed error E42. A damaged USB cable was replaced and a test page printed successfully.',
-          'E42', 'resolved', ?)
-        ON CONFLICT(entity_type, entity_id) DO UPDATE SET
-          id = excluded.id,
-          source_label = excluded.source_label,
-          title = excluded.title,
-          body = excluded.body,
-          exact_terms = excluded.exact_terms,
-          status = excluded.status,
-          updated_at = excluded.updated_at`,
-      )
-      .run(SAMPLE_IDS.caseSearchDocument, SAMPLE_IDS.supportCase, SAMPLE_TIME);
   })();
 }

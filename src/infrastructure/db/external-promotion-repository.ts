@@ -10,6 +10,7 @@ import type {
   ProviderProvenance,
 } from "../../domain/sources/provider";
 import type { DatabaseConnection } from "./client";
+import { externalSourceLabel } from "./external-source-label";
 
 export class SqliteExternalPromotionRepository implements ExternalPromotionRepository {
   constructor(
@@ -24,7 +25,7 @@ export class SqliteExternalPromotionRepository implements ExternalPromotionRepos
     return this.connection.sqlite.transaction(() => {
       const existing = this.connection.sqlite
         .prepare(
-          `SELECT article_id AS articleId FROM knowledge_source_links WHERE source_kind = 'external_item' AND external_source_id = ? AND external_item_key = ?`,
+          `SELECT article_id AS articleId FROM knowledge_source_links WHERE source_kind = 'external' AND external_source_id = ? AND external_item_key = ?`,
         )
         .get(item.sourceId, item.externalKey) as
         { articleId: string } | undefined;
@@ -43,6 +44,15 @@ export class SqliteExternalPromotionRepository implements ExternalPromotionRepos
           now,
           now,
         );
+      const persistedSource = this.connection.sqlite
+        .prepare(
+          "SELECT provider_type AS providerType, name FROM external_sources WHERE id = ?",
+        )
+        .get(item.sourceId) as { providerType: string; name: string };
+      const sourceLabel = externalSourceLabel(
+        persistedSource.providerType,
+        persistedSource.name,
+      );
       const project =
         typeof item.metadata.projectName === "string"
           ? item.metadata.projectName
@@ -79,7 +89,12 @@ export class SqliteExternalPromotionRepository implements ExternalPromotionRepos
       );
       this.connection.sqlite
         .prepare(
-          `INSERT INTO knowledge_source_links (id, article_id, source_kind, external_source_id, external_item_key, external_url, source_title, captured_at, snapshot_text, created_at) VALUES (?, ?, 'external_item', ?, ?, ?, ?, ?, ?, ?)`,
+          "DELETE FROM knowledge_source_links WHERE article_id = ? AND source_kind = 'internal'",
+        )
+        .run(article.id);
+      this.connection.sqlite
+        .prepare(
+          `INSERT INTO knowledge_source_links (id, article_id, source_kind, external_source_id, external_item_key, external_url, source_title, captured_at, snapshot_text, created_at) VALUES (?, ?, 'external', ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           crypto.randomUUID(),
@@ -92,6 +107,11 @@ export class SqliteExternalPromotionRepository implements ExternalPromotionRepos
           item.plainText.slice(0, 20_000),
           now,
         );
+      this.connection.sqlite
+        .prepare(
+          "UPDATE search_documents SET source_label = ? WHERE entity_type = 'article' AND entity_id = ?",
+        )
+        .run(sourceLabel, article.id);
       return { articleId: article.id, duplicate: false };
     })();
   }

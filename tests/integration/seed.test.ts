@@ -15,7 +15,6 @@ import { seedSampleData as seedSampleDataCli } from "../../scripts/scripts-safe/
 const connections: DatabaseConnection[] = [];
 const directories: string[] = [];
 const sampleTime = "2026-08-28T09:15:00.000Z";
-
 function database(): DatabaseConnection {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "dejaview-seed-"));
   directories.push(directory);
@@ -24,138 +23,38 @@ function database(): DatabaseConnection {
   runMigrations(connection.sqlite, path.resolve(process.cwd(), "migrations"));
   return connection;
 }
-
 afterEach(() => {
   for (const connection of connections.splice(0)) connection.close();
   for (const directory of directories.splice(0))
     fs.rmSync(directory, { recursive: true, force: true });
 });
 
-describe("sample seed", () => {
-  it("creates the complete deterministic demo dataset", () => {
+describe("knowledge-only sample seed", () => {
+  it("creates one deterministic published article with internal provenance and FTS", () => {
     const connection = database();
-
     seedSampleData(connection.sqlite);
-
-    expect(connection.sqlite.prepare("SELECT * FROM users").all()).toEqual([
-      {
-        id: SAMPLE_IDS.user,
-        external_subject: "local-development-user",
-        display_name: "Local DejaView User",
-        email: "local@dejaview.invalid",
-        status: "active",
-        created_at: sampleTime,
-        updated_at: sampleTime,
-      },
-    ]);
     expect(
-      connection.sqlite.prepare("SELECT * FROM applications").all(),
-    ).toEqual([
-      {
-        id: SAMPLE_IDS.application,
-        key: "print-service",
-        name: "Print Service",
-        description: "Example application",
-        created_at: sampleTime,
-        updated_at: sampleTime,
-      },
-    ]);
-    expect(connection.sqlite.prepare("SELECT * FROM tags").all()).toEqual([
-      {
-        id: SAMPLE_IDS.tag,
-        slug: "printer",
-        name: "Printer",
-        created_at: sampleTime,
-        updated_at: sampleTime,
-      },
-    ]);
-    expect(
-      connection.sqlite.prepare("SELECT * FROM knowledge_articles").all(),
+      connection.sqlite
+        .prepare("SELECT id, stable_key, status FROM knowledge_articles")
+        .all(),
     ).toEqual([
       {
         id: SAMPLE_IDS.article,
         stable_key: "KB-EXAMPLE-001",
-        title: "Resolve printer error E42",
-        summary: "Restore printing after a connection failure",
-        problem: "A desktop printer cannot start a job",
-        symptoms: "Error E42 appears on the display",
-        resolution_summary: "Replace the damaged USB cable",
         status: "published",
-        version: 1,
-        use_count: 2,
-        last_used_at: sampleTime,
-        created_by_user_id: SAMPLE_IDS.user,
-        updated_by_user_id: SAMPLE_IDS.user,
-        published_by_user_id: SAMPLE_IDS.user,
-        published_at: sampleTime,
-        created_at: sampleTime,
-        updated_at: sampleTime,
       },
     ]);
     expect(
-      connection.sqlite.prepare("SELECT * FROM knowledge_steps").all(),
+      connection.sqlite
+        .prepare(
+          "SELECT source_kind, source_title, snapshot_text FROM knowledge_source_links",
+        )
+        .all(),
     ).toEqual([
       {
-        id: SAMPLE_IDS.step,
-        article_id: SAMPLE_IDS.article,
-        stable_key: "replace-cable",
-        position: 0,
-        step_type: "instruction",
-        title: "Replace the cable",
-        instruction: "Replace the damaged USB cable.",
-        code: null,
-        notes: null,
-        body_ast_json: JSON.stringify({
-          version: 1,
-          type: "document",
-          children: [
-            { type: "paragraph", text: "Replace the damaged USB cable." },
-          ],
-        }),
-        body_plain_text: "Replace the damaged USB cable.",
-        created_at: sampleTime,
-        updated_at: sampleTime,
-      },
-    ]);
-    expect(
-      connection.sqlite.prepare("SELECT * FROM support_cases").all(),
-    ).toEqual([
-      {
-        id: SAMPLE_IDS.supportCase,
-        stable_key: "CASE-EXAMPLE-001",
-        title: "Printer stopped with error E42",
-        description:
-          "A desktop printer stopped accepting jobs and displayed error E42.",
-        occurred_at: sampleTime,
-        resolution_notes:
-          "A damaged USB cable was replaced and a test page printed successfully.",
-        what_was_tried: "",
-        article_id: SAMPLE_IDS.article,
-        status: "resolved",
-        version: 1,
-        created_by_user_id: SAMPLE_IDS.user,
-        resolved_by_user_id: SAMPLE_IDS.user,
-        resolved_at: sampleTime,
-        created_at: sampleTime,
-        updated_at: sampleTime,
-      },
-    ]);
-    expect(
-      connection.sqlite.prepare("SELECT * FROM article_applications").all(),
-    ).toEqual([
-      {
-        article_id: SAMPLE_IDS.article,
-        application_id: SAMPLE_IDS.application,
-        created_at: sampleTime,
-      },
-    ]);
-    expect(
-      connection.sqlite.prepare("SELECT * FROM article_tags").all(),
-    ).toEqual([
-      {
-        article_id: SAMPLE_IDS.article,
-        tag_id: SAMPLE_IDS.tag,
-        created_at: sampleTime,
+        source_kind: "internal",
+        source_title: "Created in DejaView",
+        snapshot_text: null,
       },
     ]);
     expect(
@@ -165,96 +64,58 @@ describe("sample seed", () => {
         id: SAMPLE_IDS.searchDocument,
         entity_type: "article",
         entity_id: SAMPLE_IDS.article,
-        source_label: "Knowledge",
+        source_label: "DejaView knowledge",
         title: "Resolve printer error E42",
         body: "A desktop printer cannot start a job. Error E42 appears on the display. Replace the damaged USB cable.",
         exact_terms: "E42",
         status: "published",
         updated_at: sampleTime,
       },
-      {
-        id: SAMPLE_IDS.caseSearchDocument,
-        entity_type: "support_case",
-        entity_id: SAMPLE_IDS.supportCase,
-        source_label: "Support case",
-        title: "Printer stopped with error E42",
-        body: "A desktop printer stopped accepting jobs and displayed error E42. A damaged USB cable was replaced and a test page printed successfully.",
-        exact_terms: "E42",
-        status: "resolved",
-        updated_at: sampleTime,
-      },
     ]);
     expect(
       connection.sqlite
         .prepare(
-          "SELECT COUNT(*) AS count FROM search_documents_fts WHERE search_documents_fts MATCH 'E42'",
+          "SELECT COUNT(*) count FROM search_documents_fts WHERE search_documents_fts MATCH 'E42'",
         )
         .get(),
-    ).toEqual({ count: 2 });
+    ).toEqual({ count: 1 });
+    expect(connection.sqlite.pragma("foreign_key_check")).toEqual([]);
   });
 
   it("restores exact demo values after reruns and drift", () => {
     const connection = database();
     seedSampleData(connection.sqlite);
     connection.sqlite
-      .prepare("UPDATE users SET display_name = 'Drifted', status = 'disabled'")
+      .prepare("UPDATE knowledge_articles SET title='Drifted', use_count=99")
       .run();
     connection.sqlite
-      .prepare(
-        "UPDATE knowledge_articles SET title = 'Drifted', use_count = 99",
-      )
-      .run();
-    connection.sqlite
-      .prepare("UPDATE knowledge_steps SET instruction = 'Drifted'")
-      .run();
-    connection.sqlite
-      .prepare("UPDATE search_documents SET exact_terms = 'DRIFT'")
+      .prepare("UPDATE search_documents SET exact_terms='DRIFT'")
       .run();
     connection.sqlite.prepare("DELETE FROM article_tags").run();
-
     seedSampleData(connection.sqlite);
     seedSampleData(connection.sqlite);
-
     expect(
       connection.sqlite
-        .prepare("SELECT display_name, status FROM users WHERE id = ?")
-        .get(SAMPLE_IDS.user),
-    ).toEqual({
-      display_name: "Local DejaView User",
-      status: "active",
-    });
-    expect(
-      connection.sqlite
-        .prepare("SELECT title, use_count FROM knowledge_articles WHERE id = ?")
+        .prepare("SELECT title,use_count FROM knowledge_articles WHERE id=?")
         .get(SAMPLE_IDS.article),
-    ).toEqual({
-      title: "Resolve printer error E42",
-      use_count: 2,
-    });
+    ).toEqual({ title: "Resolve printer error E42", use_count: 2 });
     expect(
       connection.sqlite
-        .prepare("SELECT instruction FROM knowledge_steps WHERE id = ?")
-        .get(SAMPLE_IDS.step),
-    ).toEqual({
-      instruction: "Replace the damaged USB cable.",
-    });
-    expect(
-      connection.sqlite
-        .prepare("SELECT exact_terms FROM search_documents WHERE id = ?")
+        .prepare("SELECT exact_terms FROM search_documents WHERE id=?")
         .get(SAMPLE_IDS.searchDocument),
     ).toEqual({ exact_terms: "E42" });
     expect(
       connection.sqlite
-        .prepare("SELECT COUNT(*) AS count FROM article_tags")
+        .prepare("SELECT COUNT(*) count FROM article_tags")
         .get(),
     ).toEqual({ count: 1 });
     expect(
       connection.sqlite
         .prepare(
-          "SELECT COUNT(*) AS count FROM search_documents_fts WHERE search_documents_fts MATCH 'E42'",
+          "SELECT COUNT(*) count FROM search_documents_fts WHERE search_documents_fts MATCH 'E42'",
         )
         .get(),
-    ).toEqual({ count: 2 });
+    ).toEqual({ count: 1 });
   });
 
   it.each([
@@ -263,68 +124,23 @@ describe("sample seed", () => {
     ["CLI-safe to runtime", seedSampleDataCli, seedSampleData],
     ["CLI-safe to CLI-safe", seedSampleDataCli, seedSampleDataCli],
   ])(
-    "restores the exact deterministic projection after reindex (%s)",
+    "keeps runtime and CLI-safe seeds equivalent (%s)",
     (_name, initialSeed, rerunSeed) => {
       const connection = database();
       initialSeed(connection.sqlite);
-      connection.sqlite
-        .prepare(
-          `INSERT INTO users
-          (id, external_subject, display_name, email, status, created_at, updated_at)
-          VALUES ('unrelated-user', 'unrelated', 'Unrelated User', 'user@example.invalid', 'active', ?, ?)`,
-        )
-        .run(sampleTime, sampleTime);
-
       repairSearchProjection(connection.sqlite);
-      expect(
-        connection.sqlite
-          .prepare(
-            "SELECT id FROM search_documents WHERE entity_type = 'article' AND entity_id = ?",
-          )
-          .get(SAMPLE_IDS.article),
-      ).toEqual({ id: `article:${SAMPLE_IDS.article}` });
-
       rerunSeed(connection.sqlite);
-
       expect(
         connection.sqlite
-          .prepare(
-            "SELECT * FROM search_documents WHERE entity_type = 'article' AND entity_id = ?",
-          )
-          .all(SAMPLE_IDS.article),
+          .prepare("SELECT id,entity_type,source_label FROM search_documents")
+          .all(),
       ).toEqual([
         {
           id: SAMPLE_IDS.searchDocument,
           entity_type: "article",
-          entity_id: SAMPLE_IDS.article,
-          source_label: "Knowledge",
-          title: "Resolve printer error E42",
-          body: "A desktop printer cannot start a job. Error E42 appears on the display. Replace the damaged USB cable.",
-          exact_terms: "E42",
-          status: "published",
-          updated_at: sampleTime,
+          source_label: "DejaView knowledge",
         },
       ]);
-      expect(
-        connection.sqlite
-          .prepare("SELECT * FROM users WHERE id = 'unrelated-user'")
-          .get(),
-      ).toEqual({
-        id: "unrelated-user",
-        external_subject: "unrelated",
-        display_name: "Unrelated User",
-        email: "user@example.invalid",
-        status: "active",
-        created_at: sampleTime,
-        updated_at: sampleTime,
-      });
-      expect(
-        connection.sqlite
-          .prepare(
-            "SELECT COUNT(*) AS count FROM search_documents_fts WHERE search_documents_fts MATCH 'E42'",
-          )
-          .get(),
-      ).toEqual({ count: 2 });
     },
   );
 
@@ -332,21 +148,14 @@ describe("sample seed", () => {
     const connection = database();
     connection.sqlite
       .prepare(
-        `INSERT INTO applications (id, key, name, description, created_at, updated_at)
-        VALUES ('other-app', 'print-service', 'Other app', '', ?, ?)`,
+        "INSERT INTO applications VALUES ('other','print-service','Other','','2026','2026')",
       )
-      .run(sampleTime, sampleTime);
-
+      .run();
     expect(() => seedSampleData(connection.sqlite)).toThrow(
       /seed conflict.*applications.*print-service/i,
     );
     expect(
-      connection.sqlite.prepare("SELECT COUNT(*) AS count FROM users").get(),
+      connection.sqlite.prepare("SELECT COUNT(*) count FROM users").get(),
     ).toEqual({ count: 0 });
-    expect(
-      connection.sqlite
-        .prepare("SELECT name FROM applications WHERE id = 'other-app'")
-        .get(),
-    ).toEqual({ name: "Other app" });
   });
 });

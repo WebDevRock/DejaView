@@ -76,7 +76,7 @@ describe("SQLite knowledge repository", () => {
       true,
     );
     expect(articles.every((article) => article.tags.length === 1)).toBe(true);
-    expect(prepare.mock.calls.length).toBeLessThanOrEqual(5);
+    expect(prepare.mock.calls.length).toBeLessThanOrEqual(6);
   });
 
   it("atomically round-trips articles, ordered stable steps, edges, applications, tags and search projection", () => {
@@ -221,6 +221,81 @@ describe("SQLite knowledge repository", () => {
     repairSearchProjection(connection.sqlite);
 
     expect(readProjection()).toEqual(live);
+  });
+
+  it("keeps providerless external and manual source labels stable across edits and reindex", () => {
+    const { connection, service } = fixture();
+    const providerless = service.quickCreate(
+      { problem: "Legacy problem", whatFixedIt: "Legacy fix" },
+      actor,
+    );
+    const manual = service.quickCreate(
+      { problem: "Manual problem", whatFixedIt: "Manual fix" },
+      actor,
+    );
+    connection.sqlite
+      .prepare("DELETE FROM knowledge_source_links WHERE article_id IN (?, ?)")
+      .run(providerless.id, manual.id);
+    connection.sqlite
+      .prepare(
+        `INSERT INTO knowledge_source_links
+         (id, article_id, source_kind, external_url, source_title, captured_at, created_at)
+         VALUES
+         ('legacy-source', ?, 'external', NULL, 'Legacy support case CASE-9', ?, ?),
+         ('manual-source', ?, 'manual', 'https://example.test/note', NULL, ?, ?)`,
+      )
+      .run(
+        providerless.id,
+        providerless.updatedAt,
+        providerless.updatedAt,
+        manual.id,
+        manual.updatedAt,
+        manual.updatedAt,
+      );
+    const edit = (article: typeof providerless) =>
+      service.update(
+        article.id,
+        {
+          version: article.version,
+          title: `${article.title} edited`,
+          summary: article.summary,
+          problem: article.problem,
+          symptoms: article.symptoms,
+          resolutionSummary: article.resolutionSummary,
+          steps: article.steps,
+          edges: article.edges.map(
+            ({ fromStepId, toStepId, edgeType, label }) => ({
+              fromStepId,
+              toStepId,
+              edgeType,
+              label,
+            }),
+          ),
+          applications: article.applications.map((item) => item.name),
+          tags: article.tags.map((item) => item.name),
+        },
+        actor,
+      );
+    edit(providerless);
+    edit(manual);
+    const labels = () =>
+      connection.sqlite
+        .prepare(
+          "SELECT entity_id, source_label FROM search_documents WHERE entity_id IN (?, ?) ORDER BY entity_id",
+        )
+        .all(manual.id, providerless.id);
+
+    expect(labels()).toEqual([
+      { entity_id: providerless.id, source_label: "Legacy source" },
+      { entity_id: manual.id, source_label: "Manual source" },
+    ]);
+
+    repairSearchProjection(connection.sqlite);
+
+    expect(labels()).toEqual([
+      { entity_id: providerless.id, source_label: "Legacy source" },
+      { entity_id: manual.id, source_label: "Manual source" },
+    ]);
   });
 
   it("does not partially replace children when optimistic locking fails", () => {

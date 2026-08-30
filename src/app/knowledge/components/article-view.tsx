@@ -8,6 +8,18 @@ import type { RelatedArticle } from "@/application/articles/related-article-serv
 import { UsefulnessPanel } from "./usefulness-panel";
 import { CodeViewer } from "./code-viewer";
 
+function safeExternalUrl(value: string | null): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:"
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 const labels: Record<KnowledgeStep["stepType"], string> = {
   instruction: "Instruction",
   check: "Check",
@@ -91,6 +103,42 @@ export function ArticleView({
             ))}
           </ol>
         </section>
+        {article.sources.length > 0 && (
+          <section>
+            <h2>Source</h2>
+            <ul>
+              {article.sources.map((source, index) => {
+                const href = safeExternalUrl(source.externalUrl);
+                return (
+                  <li
+                    key={`${source.kind}:${source.externalKey ?? source.capturedAt}:${index}`}
+                  >
+                    <strong>{source.label}</strong>
+                    {source.providerLabel &&
+                    source.providerLabel !== source.label
+                      ? ` — ${source.providerLabel}`
+                      : ""}
+                    {source.externalKey && href ? (
+                      <>
+                        {" — "}
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {source.externalKey}
+                        </a>
+                      </>
+                    ) : source.sourceTitle &&
+                      source.sourceTitle !== source.label ? (
+                      ` — ${source.sourceTitle}`
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
         {article.edges.length > 0 && (
           <section>
             <h2>Flow</h2>

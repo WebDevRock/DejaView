@@ -14,6 +14,7 @@ import { SqliteExternalPromotionRepository } from "@/infrastructure/db/external-
 import { KnowledgeService } from "@/application/articles/knowledge-service";
 import type { KnowledgeSourceProvider } from "@/domain/sources/provider";
 import { PromoteExternalItemService } from "@/application/sources/promote-external-item";
+import { repairSearchProjection } from "@/infrastructure/search/projection-repair";
 
 let directory = "";
 let connection: DatabaseConnection;
@@ -89,14 +90,32 @@ describe("Jira promotion", () => {
       status: "Draft",
       title: "Payroll printer fails",
       applications: [{ key: "payroll", name: "Payroll" }],
+      sources: [
+        {
+          kind: "external",
+          providerType: "jira",
+          label: "Jira",
+          providerLabel: "Support Jira",
+          externalKey: "SUP-42",
+          externalUrl: "https://tenant.atlassian.net/browse/SUP-42",
+          sourceTitle: "Payroll printer fails",
+        },
+      ],
     });
+    expect(
+      connection.sqlite
+        .prepare(
+          "SELECT source_label FROM search_documents WHERE entity_id = ?",
+        )
+        .get(first.articleId),
+    ).toEqual({ source_label: "Jira" });
     const provenance = connection.sqlite
       .prepare(
         "SELECT source_kind, external_item_key, source_title, snapshot_text FROM knowledge_source_links WHERE article_id = ?",
       )
       .get(first.articleId);
     expect(provenance).toEqual({
-      source_kind: "external_item",
+      source_kind: "external",
       external_item_key: "SUP-42",
       source_title: "Payroll printer fails",
       snapshot_text: "Description without comments",
@@ -114,7 +133,7 @@ describe("Jira promotion", () => {
     });
   });
 
-  it("persists generic provider provenance without Jira defaults", () => {
+  it("uses the persisted generic provider name throughout projection updates", () => {
     const knowledge = new KnowledgeService(
       new SqliteKnowledgeArticleRepository(connection),
     );
@@ -122,7 +141,20 @@ describe("Jira promotion", () => {
       connection,
       knowledge,
     );
-    repository.promote(
+    const now = "2026-08-28T09:15:00.000Z";
+    connection.sqlite
+      .prepare(
+        `INSERT INTO external_sources
+         (id, provider_type, name, enabled, base_url, config_json, secret_env_ref, created_at, updated_at)
+         VALUES ('tracker', 'ticketing', 'Persisted provider A', 1, 'https://tracker.example', '{}', 'TRACKER_TOKEN', ?, ?)`,
+      )
+      .run(now, now);
+    const actor = {
+      id: SAMPLE_IDS.user,
+      displayName: "User",
+      role: "editor" as const,
+    };
+    const promoted = repository.promote(
       {
         id: "tracker:INC-1",
         externalKey: "INC-1",
@@ -130,7 +162,7 @@ describe("Jira promotion", () => {
         snippet: "",
         url: "https://tracker.example/items/INC-1",
         sourceId: "tracker",
-        sourceLabel: "Incident tracker",
+        sourceLabel: "Imported provider B",
         status: "open",
         score: 1,
         updatedAt: "2026-08-28T10:00:00Z",
@@ -138,13 +170,20 @@ describe("Jira promotion", () => {
         content: [],
         plainText: "Generic details",
       },
-      { id: SAMPLE_IDS.user, displayName: "User", role: "editor" },
+      actor,
       {
         providerType: "ticketing",
         secretEnvRef: "TRACKER_TOKEN",
         promotionGuidance: "Verify and document the incident resolution.",
       },
     );
+    const label = () =>
+      connection.sqlite
+        .prepare(
+          "SELECT source_label FROM search_documents WHERE entity_id = ?",
+        )
+        .get(promoted.articleId);
+    expect(label()).toEqual({ source_label: "Persisted provider A" });
     expect(
       connection.sqlite
         .prepare(
@@ -155,5 +194,34 @@ describe("Jira promotion", () => {
       provider_type: "ticketing",
       secret_env_ref: "TRACKER_TOKEN",
     });
+
+    const article = knowledge.get(promoted.articleId);
+    knowledge.update(
+      article.id,
+      {
+        version: article.version,
+        title: "Updated generic incident",
+        summary: article.summary,
+        problem: article.problem,
+        symptoms: article.symptoms,
+        resolutionSummary: article.resolutionSummary,
+        steps: article.steps,
+        edges: article.edges,
+        applications: article.applications.map(
+          (application) => application.name,
+        ),
+        tags: article.tags.map((tag) => tag.name),
+      },
+      actor,
+    );
+    expect(label()).toEqual({ source_label: "Persisted provider A" });
+
+    connection.sqlite
+      .prepare(
+        "UPDATE search_documents SET source_label='Imported provider B' WHERE entity_id=?",
+      )
+      .run(promoted.articleId);
+    repairSearchProjection(connection.sqlite);
+    expect(label()).toEqual({ source_label: "Persisted provider A" });
   });
 });

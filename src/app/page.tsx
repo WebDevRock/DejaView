@@ -53,8 +53,8 @@ export function HomeContent({ articles }: { articles: HomeArticle[] }) {
           What problem are you trying to solve?
         </h1>
         <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-600">
-          Local-first support knowledge: search published articles and resolved
-          cases by symptom, application or exact error.
+          Local-first support knowledge: search published articles by symptom,
+          application or exact error.
         </p>
         <form
           action="/search"
@@ -85,7 +85,6 @@ export function HomeContent({ articles }: { articles: HomeArticle[] }) {
             </p>
           </div>
           <nav className="flex gap-4">
-            <Link href="/cases">Support cases</Link>
             <Link href="/knowledge/new">Add knowledge</Link>
           </nav>
         </div>

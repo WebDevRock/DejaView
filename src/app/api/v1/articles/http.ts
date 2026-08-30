@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { z, ZodError, type ZodType } from "zod";
 import { AuthorisationError } from "@/app/auth/authorisation";
 import { KnowledgeArticleError } from "@/domain/knowledge/article";
-import { SupportCaseError } from "@/domain/support/support-case";
 import { ProviderError } from "@/domain/sources/provider";
 
 export const dataResponse = (data: unknown, status = 200) =>
@@ -48,10 +47,7 @@ export function errorResponse(error: unknown): NextResponse {
       { error: { code: error.code, message: error.message, requestId } },
       { status: error.status },
     );
-  if (
-    error instanceof KnowledgeArticleError ||
-    error instanceof SupportCaseError
-  ) {
+  if (error instanceof KnowledgeArticleError) {
     const status =
       error.code === "not_found"
         ? 404

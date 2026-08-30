@@ -6,18 +6,22 @@ import type { ArticleFeedback } from "../../application/articles/article-usefuln
 import type {
   ArticleStatus,
   KnowledgeArticle,
+  KnowledgeSource,
   KnowledgeStep,
   NamedApplication,
   NamedTag,
   StepEdge,
 } from "../../domain/knowledge/article";
 import type { DatabaseConnection } from "./client";
+import { externalSourceLabel } from "./external-source-label";
 import {
   applications,
   articleApplications,
   articleFeedback,
   articleTags,
+  externalSources,
   knowledgeArticles,
+  knowledgeSourceLinks,
   knowledgeSteps,
   searchDocuments,
   stepEdges,
@@ -43,6 +47,7 @@ export class SqliteKnowledgeArticleRepository implements KnowledgeArticleReposit
         .get();
       if (!inserted) throw new Error("Article insert did not return an ID");
       this.replaceOwnedRecords(article);
+      this.insertInitialSources(article);
       this.writeSearchDocument(article);
     })();
     return this.required(article.id);
@@ -97,6 +102,7 @@ export class SqliteKnowledgeArticleRepository implements KnowledgeArticleReposit
       .where(inArray(articleTags.articleId, ids))
       .orderBy(asc(articleTags.articleId), asc(tags.name))
       .all();
+    const allSources = this.sourcesFor(ids);
 
     return rows.map((row) => ({
       ...row,
@@ -109,7 +115,13 @@ export class SqliteKnowledgeArticleRepository implements KnowledgeArticleReposit
       tags: allTags
         .filter((tag) => tag.articleId === row.id)
         .map(({ slug, name }) => ({ slug, name })),
-      sourceLabels: ["Knowledge"],
+      sources: allSources
+        .filter((source) => source.articleId === row.id)
+        .map((source) => {
+          const { articleId, ...withoutArticleId } = source;
+          void articleId;
+          return withoutArticleId;
+        }),
     }));
   }
 
@@ -156,7 +168,11 @@ export class SqliteKnowledgeArticleRepository implements KnowledgeArticleReposit
       edges,
       applications: linkedApplications,
       tags: linkedTags,
-      sourceLabels: ["Knowledge"],
+      sources: this.sourcesFor([id]).map((source) => {
+        const { articleId, ...withoutArticleId } = source;
+        void articleId;
+        return withoutArticleId;
+      }),
     };
   }
 
@@ -283,6 +299,65 @@ export class SqliteKnowledgeArticleRepository implements KnowledgeArticleReposit
     for (const tag of article.tags) this.linkTag(article, tag);
   }
 
+  private insertInitialSources(article: KnowledgeArticle): void {
+    if (!article.sources.length) return;
+    this.connection.db
+      .insert(knowledgeSourceLinks)
+      .values(
+        article.sources.map((source) => ({
+          id: crypto.randomUUID(),
+          articleId: article.id,
+          sourceKind: source.kind,
+          externalSourceId: null,
+          externalItemKey: source.externalKey,
+          externalUrl: source.externalUrl,
+          sourceTitle: source.sourceTitle,
+          capturedAt: source.capturedAt,
+          snapshotText: null,
+          createdAt: source.capturedAt,
+        })),
+      )
+      .run();
+  }
+
+  private sourcesFor(
+    ids: string[],
+  ): Array<KnowledgeSource & { articleId: string }> {
+    return this.connection.db
+      .select({
+        articleId: knowledgeSourceLinks.articleId,
+        kind: knowledgeSourceLinks.sourceKind,
+        providerType: externalSources.providerType,
+        providerLabel: externalSources.name,
+        externalKey: knowledgeSourceLinks.externalItemKey,
+        externalUrl: knowledgeSourceLinks.externalUrl,
+        sourceTitle: knowledgeSourceLinks.sourceTitle,
+        capturedAt: knowledgeSourceLinks.capturedAt,
+      })
+      .from(knowledgeSourceLinks)
+      .leftJoin(
+        externalSources,
+        eq(knowledgeSourceLinks.externalSourceId, externalSources.id),
+      )
+      .where(inArray(knowledgeSourceLinks.articleId, ids))
+      .orderBy(
+        asc(knowledgeSourceLinks.createdAt),
+        asc(knowledgeSourceLinks.id),
+      )
+      .all()
+      .map((source) => ({
+        ...source,
+        providerType:
+          source.kind === "internal" ? "dejaview" : source.providerType,
+        label:
+          source.kind === "internal"
+            ? "Created in DejaView"
+            : source.providerType && source.providerLabel
+              ? externalSourceLabel(source.providerType, source.providerLabel)
+              : (source.sourceTitle ?? "External source"),
+      }));
+  }
+
   private linkApplication(
     article: KnowledgeArticle,
     application: NamedApplication,
@@ -361,7 +436,41 @@ export class SqliteKnowledgeArticleRepository implements KnowledgeArticleReposit
       .run();
   }
 
+  private searchSourceLabel(articleId: string): string {
+    const source = this.connection.sqlite
+      .prepare(
+        `SELECT l.source_kind kind, l.source_title sourceTitle,
+                e.provider_type providerType, e.name providerLabel
+         FROM knowledge_source_links l
+         LEFT JOIN external_sources e ON e.id=l.external_source_id
+         WHERE l.article_id=?
+         ORDER BY CASE
+                    WHEN e.id IS NOT NULL THEN 0
+                    WHEN l.source_kind='internal' THEN 1
+                    WHEN l.source_kind='external' THEN 2
+                    WHEN l.source_kind='manual' THEN 3
+                    ELSE 4
+                  END,
+                  l.created_at, l.id
+         LIMIT 1`,
+      )
+      .get(articleId) as
+      | {
+          kind: string;
+          sourceTitle: string | null;
+          providerType: string | null;
+          providerLabel: string | null;
+        }
+      | undefined;
+    if (source?.providerType && source.providerLabel)
+      return externalSourceLabel(source.providerType, source.providerLabel);
+    if (source?.kind === "external") return "Legacy source";
+    if (source?.kind === "manual") return source.sourceTitle ?? "Manual source";
+    return "DejaView knowledge";
+  }
+
   private writeSearchDocument(article: KnowledgeArticle): void {
+    const sourceLabel = this.searchSourceLabel(article.id);
     const body = [
       article.summary,
       article.problem,
@@ -394,7 +503,7 @@ export class SqliteKnowledgeArticleRepository implements KnowledgeArticleReposit
         id: `article:${article.id}`,
         entityType: "article",
         entityId: article.id,
-        sourceLabel: "Knowledge",
+        sourceLabel,
         title: article.title,
         body,
         exactTerms,
@@ -409,7 +518,7 @@ export class SqliteKnowledgeArticleRepository implements KnowledgeArticleReposit
           exactTerms,
           status: toDatabaseStatus(article.status),
           updatedAt: article.updatedAt,
-          sourceLabel: "Knowledge",
+          sourceLabel,
         },
       })
       .run();

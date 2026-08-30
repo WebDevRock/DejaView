@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   index,
   integer,
@@ -179,36 +180,6 @@ export const articleTags = sqliteTable(
   (table) => [primaryKey({ columns: [table.articleId, table.tagId] })],
 );
 
-export const supportCases = sqliteTable(
-  "support_cases",
-  {
-    id: text("id").primaryKey(),
-    stableKey: text("stable_key").notNull().unique(),
-    title: text("title").notNull(),
-    description: text("description").notNull(),
-    occurredAt: text("occurred_at").notNull(),
-    resolutionNotes: text("resolution_notes").notNull().default(""),
-    articleId: text("article_id").references(() => knowledgeArticles.id, {
-      onDelete: "set null",
-    }),
-    status: text("status", { enum: ["open", "resolved", "closed"] }).notNull(),
-    createdByUserId: text("created_by_user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "restrict" }),
-    resolvedByUserId: text("resolved_by_user_id").references(() => users.id, {
-      onDelete: "restrict",
-    }),
-    resolvedAt: text("resolved_at"),
-    ...timestamps,
-  },
-  (table) => [
-    index("support_cases_status_updated_at_idx").on(
-      table.status,
-      table.updatedAt,
-    ),
-  ],
-);
-
 export const externalSources = sqliteTable(
   "external_sources",
   {
@@ -237,11 +208,8 @@ export const knowledgeSourceLinks = sqliteTable(
       .notNull()
       .references(() => knowledgeArticles.id, { onDelete: "cascade" }),
     sourceKind: text("source_kind", {
-      enum: ["support_case", "external_item", "manual"],
+      enum: ["internal", "external", "manual"],
     }).notNull(),
-    supportCaseId: text("support_case_id").references(() => supportCases.id, {
-      onDelete: "restrict",
-    }),
     externalSourceId: text("external_source_id").references(
       () => externalSources.id,
       { onDelete: "restrict" },
@@ -259,6 +227,11 @@ export const knowledgeSourceLinks = sqliteTable(
       table.externalSourceId,
       table.externalItemKey,
     ),
+    uniqueIndex("knowledge_source_links_external_item_unique")
+      .on(table.externalSourceId, table.externalItemKey)
+      .where(
+        sql`${table.externalSourceId} IS NOT NULL AND ${table.externalItemKey} IS NOT NULL`,
+      ),
   ],
 );
 
@@ -288,9 +261,7 @@ export const searchDocuments = sqliteTable(
   "search_documents",
   {
     id: text("id").primaryKey(),
-    entityType: text("entity_type", {
-      enum: ["article", "support_case"],
-    }).notNull(),
+    entityType: text("entity_type", { enum: ["article"] }).notNull(),
     entityId: text("entity_id").notNull(),
     sourceLabel: text("source_label").notNull(),
     title: text("title").notNull(),

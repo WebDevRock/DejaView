@@ -37,7 +37,9 @@ export class SearchService {
     });
     const includeInternal =
       !normalised.source ||
-      ["knowledge", "support_case"].includes(normalised.source);
+      normalised.source === "knowledge" ||
+      normalised.source === "external" ||
+      this.providers.some((provider) => provider.id === normalised.source);
     const settled = await Promise.allSettled([
       ...(includeInternal ? [this.internal.search(normalised)] : []),
       ...eligibleProviders.map((provider) =>
@@ -120,6 +122,5 @@ function tier(result: {
 }): number {
   if (result.exactMatch) return 0;
   if (result.kind === "article" && result.status === "Published") return 1;
-  if (result.kind === "support_case" && result.status === "Resolved") return 2;
-  return 3;
+  return 2;
 }

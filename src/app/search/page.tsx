@@ -26,12 +26,12 @@ export default async function SearchPage({
   };
   const result = await searchService().search({
     text: q,
-    source: value("source") as "knowledge" | "support_case" | undefined,
+    source: value("source") as "knowledge" | "external" | "jira" | undefined,
     application: value("application"),
     tag: value("tag"),
     dateFrom: value("dateFrom"),
     dateTo: value("dateTo"),
-    status: value("status") as "published" | "resolved" | undefined,
+    status: value("status") as "published" | undefined,
     cursor: value("cursor"),
   });
   return (

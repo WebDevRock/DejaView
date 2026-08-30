@@ -16,7 +16,7 @@ describe("search interface", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("searchbox")).toHaveAttribute("name", "q");
   });
-  it("shows mixed results with clear source labels and plain snippets", () => {
+  it("shows knowledge results with clear source labels and plain snippets", () => {
     render(
       <SearchResults
         results={[
@@ -33,24 +33,11 @@ describe("search interface", () => {
             updatedAt: "2026-08-28T00:00:00.000Z",
             metadata: {},
           },
-          {
-            id: "support-case:c",
-            kind: "support_case",
-            title: "Printer case",
-            snippet: "Restarted",
-            url: "/cases/c",
-            sourceLabel: "Support case",
-            status: "Resolved",
-            score: 2,
-            exactMatch: false,
-            updatedAt: "2026-08-27T00:00:00.000Z",
-            metadata: {},
-          },
         ]}
       />,
     );
     expect(screen.getByText("Knowledge")).toBeInTheDocument();
-    expect(screen.getByText("Support case")).toBeInTheDocument();
+
     expect(screen.getByText("Replace cable")).toBeInTheDocument();
   });
 

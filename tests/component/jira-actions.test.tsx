@@ -31,7 +31,7 @@ describe("Jira issue actions", () => {
       screen.getByRole("button", { name: "Loading comments…" }),
     ).toBeDisabled();
     expect(
-      screen.getByRole("button", { name: "Promote to draft" }),
+      screen.getByRole("button", { name: "Import to knowledge" }),
     ).toBeDisabled();
     rejectRequest(new Error("network details"));
 
@@ -51,7 +51,9 @@ describe("Jira issue actions", () => {
     const user = userEvent.setup();
     render(<JiraActions issueKey="SUP-1" />);
 
-    await user.click(screen.getByRole("button", { name: "Promote to draft" }));
+    await user.click(
+      screen.getByRole("button", { name: "Import to knowledge" }),
+    );
 
     expect(
       await screen.findByText(
@@ -205,7 +207,9 @@ describe("Jira issue actions", () => {
     const user = userEvent.setup();
     render(<JiraActions issueKey="SUP-1" />);
 
-    await user.click(screen.getByRole("button", { name: "Promote to draft" }));
+    await user.click(
+      screen.getByRole("button", { name: "Import to knowledge" }),
+    );
 
     expect(push).toHaveBeenCalledWith("/knowledge/article-1/edit");
   });

@@ -45,7 +45,18 @@ const article: KnowledgeArticle = {
   updatedAt: "2026-08-28T10:00:00.000Z",
   applications: [{ key: "payroll", name: "Payroll" }],
   tags: [{ slug: "database", name: "Database" }],
-  sourceLabels: ["Knowledge"],
+  sources: [
+    {
+      kind: "internal",
+      providerType: "dejaview",
+      label: "Created in DejaView",
+      providerLabel: null,
+      externalKey: null,
+      externalUrl: null,
+      sourceTitle: "Created in DejaView",
+      capturedAt: "2026-08-28T10:00:00.000Z",
+    },
+  ],
   steps: [
     {
       id: "00000000-0000-4000-8000-000000000011",
@@ -151,6 +162,46 @@ describe("knowledge authoring UI", () => {
     expect(screen.getByText("SQL")).toBeInTheDocument();
     expect(screen.getByText("Payroll")).toBeInTheDocument();
     expect(screen.getByText("Database")).toBeInTheDocument();
+  });
+
+  it("shows canonical Jira provenance with the exact safe backlink", () => {
+    render(
+      <ArticleView
+        article={{
+          ...article,
+          sources: [
+            {
+              kind: "external",
+              providerType: "jira",
+              label: "Jira",
+              providerLabel: "Support Jira",
+              externalKey: "SUP-42",
+              externalUrl: "https://tenant.atlassian.net/browse/SUP-42",
+              sourceTitle: "Payroll printer fails",
+              capturedAt: "2026-08-28T10:00:00.000Z",
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Source" })).toBeVisible();
+    expect(screen.getByText("Jira")).toBeVisible();
+    expect(
+      screen.getByText((_, element) =>
+        Boolean(
+          element?.tagName === "LI" &&
+          element.textContent?.includes("Support Jira"),
+        ),
+      ),
+    ).toBeVisible();
+    const link = screen.getByRole("link", { name: "SUP-42" });
+    expect(link).toHaveAttribute(
+      "href",
+      "https://tenant.atlassian.net/browse/SUP-42",
+    );
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
 
   it("copies step code and confirms success", async () => {

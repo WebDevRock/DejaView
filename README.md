@@ -1,18 +1,19 @@
 # DejaView
 
-DejaView is a local-first support knowledge capture and federated search application. It starts with the problem a support worker is trying to solve — a symptom, application name, exact error or quoted phrase — rather than asking them to browse a knowledge hierarchy. It brings reusable fixes, resolved support cases and optional Jira Cloud results into one clearly labelled result set, then lets an editor turn proven work into reviewed knowledge.
+DejaView is a local-first knowledge capture and federated search application. It starts with the problem a user is trying to solve — a symptom, application name, exact error or quoted phrase — rather than asking them to browse a hierarchy. It combines reusable local knowledge with optional Jira Cloud results in one clearly labelled result set.
 
 ## MVP features
 
-- Problem-first search across published knowledge articles, resolved support cases and an optional Jira Cloud provider.
+- Problem-first search across published knowledge articles and an optional Jira Cloud provider.
 - SQLite FTS5 search with exact-term handling, filters, deterministic ranking, pagination and partial-provider-failure warnings.
 - Quick article capture, structured step editing, draft publication, applications, tags and related knowledge.
-- Support-case capture, editing, resolution and draft-article creation with provenance.
+
 - Useful/not-useful article feedback, optional difference notes and usage counts.
 - Lazy Jira issue detail and paginated comments, with safe Atlassian Document Format rendering.
 - Explicit, duplicate-safe promotion of a fresh Jira issue snapshot into a local **Draft** article.
 - Versioned JSON API, input validation, optimistic concurrency and same-origin mutation checks.
-- Deterministic, idempotent demonstration data for a published article and linked resolved case. Search for `E42` after seeding.
+- Visible, provider-neutral provenance for local and imported articles, including exact safe source backlinks.
+- Deterministic, idempotent demonstration data for a published article. Search for `E42` after seeding.
 
 ## Architecture
 
@@ -56,7 +57,7 @@ npm run db:seed
 npm run dev
 ```
 
-Open <http://localhost:3000>. The seed is deterministic and safe to rerun: it restores only its fixed demonstration records and leaves unrelated records intact. It includes a published printer-error article, a linked resolved support case, application/tag metadata and FTS projections. Search for `E42` to exercise the main demo path.
+Open <http://localhost:3000>. The seed is deterministic and safe to rerun: it restores only its fixed demonstration records and leaves unrelated records intact. It includes a published printer-error article with internal provenance, application/tag metadata and an FTS projection. Search for `E42` to exercise the main demo path.
 
 The application also runs pending migrations when it first opens the database. Running the migration command explicitly makes setup and deployment failures visible before the server starts.
 
@@ -126,7 +127,7 @@ Never paste tokens into documentation, screenshots, URLs, browser code or logs. 
 
 ## API overview
 
-Successful responses use `{ data, meta }`; errors use `{ error: { code, message, fieldErrors?, requestId } }`. Mutation bodies are JSON. Article and case updates require the current `version` for optimistic concurrency.
+Successful responses use `{ data, meta }`; errors use `{ error: { code, message, fieldErrors?, requestId } }`. Mutation bodies are JSON. Article updates require the current `version` for optimistic concurrency.
 
 ```text
 GET    /api/v1/health
@@ -141,12 +142,6 @@ GET    /api/v1/articles/:id/feedback
 POST   /api/v1/articles/:id/feedback
 GET    /api/v1/articles/:id/related
 
-GET    /api/v1/cases
-POST   /api/v1/cases
-GET    /api/v1/cases/:id
-PATCH  /api/v1/cases/:id
-POST   /api/v1/cases/:id/resolve
-POST   /api/v1/cases/:id/draft-article
 
 GET    /api/v1/providers/jira/search?q=...&project=...&limit=...
 GET    /api/v1/providers/jira/issues/:key
@@ -154,7 +149,7 @@ GET    /api/v1/providers/jira/issues/:key?includeComments=true&cursor=0
 POST   /api/v1/providers/jira/issues/:key/promote
 ```
 
-The unified search endpoint accepts `source=knowledge|support_case|external|jira`; `status` is `published` or `resolved`. Consult route schemas for complete payload contracts and limits.
+The unified search endpoint accepts `source=knowledge|external|jira`; local search status is `published`. `source=jira` selects the live Jira provider and any imported articles whose canonical provider type is Jira. Consult route schemas for complete payload contracts and limits.
 
 ## Quality checks
 

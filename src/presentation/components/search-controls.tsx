@@ -39,8 +39,7 @@ export function SearchControls({ values }: { values: SearchControlValues }) {
         className="rounded-lg border bg-white px-3"
       >
         <option value="">All sources</option>
-        <option value="knowledge">Knowledge</option>
-        <option value="support_case">Support cases</option>
+        <option value="knowledge">DejaView knowledge</option>
         <option value="external">External sources</option>
       </select>
       <select
@@ -51,7 +50,6 @@ export function SearchControls({ values }: { values: SearchControlValues }) {
       >
         <option value="">All searchable statuses</option>
         <option value="published">Published</option>
-        <option value="resolved">Resolved and closed</option>
       </select>
       <input
         name="application"

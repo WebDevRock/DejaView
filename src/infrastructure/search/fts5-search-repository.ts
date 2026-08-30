@@ -13,7 +13,7 @@ import { repairSearchProjection as repairProjection } from "./projection-repair"
 
 type Row = {
   id: string;
-  entity_type: "article" | "support_case";
+  entity_type: "article";
   entity_id: string;
   source_label: string;
   title: string;
@@ -155,26 +155,29 @@ export class SqliteFts5SearchRepository implements SearchPort {
     const needleBlob = needles.join("\u0000");
     const where = [
       "search_documents_fts MATCH ?",
-      "((d.entity_type='article' AND d.status='published') OR (d.entity_type='support_case' AND d.status IN ('resolved','closed')))",
+      "d.entity_type='article' AND d.status='published'",
     ];
     const params: unknown[] = [needleBlob, expression];
-    if (query.source) {
-      where.push("d.entity_type = ?");
-      params.push(query.source === "knowledge" ? "article" : "support_case");
-    }
-    if (query.status === "published") {
-      where.push("d.entity_type='article' AND d.status='published'");
-    } else if (query.status === "resolved") {
+    if (query.source === "knowledge")
       where.push(
-        "d.entity_type='support_case' AND d.status IN ('resolved','closed')",
+        "NOT EXISTS (SELECT 1 FROM knowledge_source_links l WHERE l.article_id=d.entity_id AND l.source_kind='external' AND l.external_source_id IS NOT NULL)",
       );
+    else if (query.source === "external")
+      where.push(
+        "EXISTS (SELECT 1 FROM knowledge_source_links l WHERE l.article_id=d.entity_id AND l.source_kind='external')",
+      );
+    else if (query.source) {
+      where.push(
+        "EXISTS (SELECT 1 FROM knowledge_source_links l JOIN external_sources e ON e.id=l.external_source_id WHERE l.article_id=d.entity_id AND e.provider_type=?)",
+      );
+      params.push(query.source);
     }
     if (query.dateFrom) {
-      where.push("COALESCE(c.resolved_at,d.updated_at) >= ?");
+      where.push("d.updated_at >= ?");
       params.push(query.dateFrom);
     }
     if (query.dateTo) {
-      where.push("COALESCE(c.resolved_at,d.updated_at) <= ?");
+      where.push("d.updated_at <= ?");
       params.push(query.dateTo);
     }
     if (query.application) {
@@ -215,11 +218,10 @@ export class SqliteFts5SearchRepository implements SearchPort {
             snippet(search_documents_fts,1,'','',' … ',24) snippet,d.status,
             d.updated_at,bm25(search_documents_fts,5.0,1.0,12.0) rank,
             CASE WHEN dejaview_exact(d.exact_terms, ?) = 1
-              THEN CASE WHEN d.entity_type='article' THEN 0 ELSE 1 END
-              ELSE CASE WHEN d.entity_type='article' THEN 2 ELSE 3 END END tier
+              THEN 0 ELSE 1 END tier
           FROM search_documents_fts
           JOIN search_documents d ON d.rowid=search_documents_fts.rowid
-          LEFT JOIN support_cases c ON c.id=d.entity_id AND d.entity_type='support_case'
+
           WHERE ${where.join(" AND ")}
         )
         SELECT * FROM scored ${keyset}
@@ -234,14 +236,11 @@ export class SqliteFts5SearchRepository implements SearchPort {
       kind: row.entity_type,
       title: row.title,
       snippet: plainSnippet(row.snippet || row.title),
-      url:
-        row.entity_type === "article"
-          ? `/knowledge/${row.entity_id}`
-          : `/cases/${row.entity_id}`,
+      url: `/knowledge/${row.entity_id}`,
       sourceLabel: row.source_label,
-      status: row.status === "published" ? "Published" : "Resolved",
+      status: "Published",
       score: row.rank,
-      exactMatch: row.tier < 2,
+      exactMatch: row.tier === 0,
       updatedAt: row.updated_at,
       metadata: { entityId: row.entity_id },
     }));

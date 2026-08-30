@@ -3,14 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
-import { CaseForm } from "@/app/cases/components/case-form";
 import { UsefulnessPanel } from "@/app/knowledge/components/usefulness-panel";
 describe("milestone 3 UI", () => {
-  it("renders practical case fields", () => {
-    render(<CaseForm />);
-    expect(screen.getByLabelText("What was tried")).toBeInTheDocument();
-    expect(screen.getByLabelText("When did it occur?")).toBeInTheDocument();
-  });
   it("offers Yes and No usefulness actions", () => {
     render(
       <UsefulnessPanel

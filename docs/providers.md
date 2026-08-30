@@ -14,7 +14,7 @@ The Phase 1 Jira Cloud adapter has one canonical identity:
 | Secret environment reference                 | `JIRA_API_TOKEN` |
 | Default display label                        | `Jira`           |
 
-`JIRA_SOURCE_LABEL` may change the visible label, but it does not create a second Jira source or alter the canonical ID/type. Jira result IDs are `jira:<ISSUE-KEY>`. Promotion provenance uses the same source ID and the `(external_source_id, external_item_key)` pair prevents duplicate local drafts.
+`JIRA_SOURCE_LABEL` changes the live provider/result label, but it does not create a second Jira source or alter the canonical ID/type. Jira result IDs are `jira:<ISSUE-KEY>`. Promotion provenance uses the same source ID and the `(external_source_id, external_item_key)` pair prevents duplicate local drafts. Imported article provenance is visibly canonical **Jira** while also retaining the configured provider label, exact issue key and validated canonical backlink.
 
 ## Jira environment configuration
 
@@ -67,7 +67,7 @@ An editor or administrator can explicitly promote an allowed Jira issue from a s
 
 1. refetches the issue detail from Jira rather than trusting the search result or browser payload;
 2. creates a local **Draft** article with generic, provider-neutral provenance;
-3. records source ID, external key, canonical issue URL, title, capture time and sanitised description plain text (up to the application limit);
+3. records source ID, external key, exact validated canonical issue URL, configured source label, title, capture time and sanitised description plain text (up to the application limit);
 4. stores only the name `JIRA_API_TOKEN` as `secret_env_ref`, never the token value;
 5. returns the existing linked draft on repeated promotion rather than creating a duplicate.
 
@@ -82,7 +82,7 @@ The user must review, complete and publish the draft separately. Promotion does 
 
 Unified `GET /api/v1/search` also includes Jira unless filters exclude it; `source=external` or `source=jira` selects external/Jira results. Responses use the v1 `{ data, meta }` envelope. Search and detail are read operations. Promotion requires an authenticated editor/admin and explicit same-origin browser evidence.
 
-In the UI, search from `/search` with **All sources** or **External sources**. Jira results use the configured display label. Opening one loads safe detail; comments load only on request. **Promote to draft** refetches and opens the local editor, while repeated promotion opens the already-linked draft.
+In the UI, search from `/search` with **All sources** or **External sources**. Live Jira results use the configured display label. Opening one loads safe detail; comments load only on request. **Promote to draft** refetches and opens the local editor, while repeated promotion opens the already-linked draft. The imported article displays canonical **Jira**, the configured source label, issue key and exact safe backlink; its stored snapshot remains internal and is not exposed as provenance UI content.
 
 ## Mocked and live verification
 

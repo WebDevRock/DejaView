@@ -24,6 +24,17 @@ export interface NamedTag {
   name: string;
 }
 
+export interface KnowledgeSource {
+  kind: "internal" | "external" | "manual";
+  providerType: string | null;
+  label: string;
+  providerLabel: string | null;
+  externalKey: string | null;
+  externalUrl: string | null;
+  sourceTitle: string | null;
+  capturedAt: string;
+}
+
 export interface KnowledgeStep {
   id: string;
   articleId: string;
@@ -72,7 +83,7 @@ export interface KnowledgeArticle {
   edges: StepEdge[];
   applications: NamedApplication[];
   tags: NamedTag[];
-  sourceLabels: string[];
+  sources: KnowledgeSource[];
 }
 
 export interface AuthoringContext {
@@ -240,7 +251,18 @@ export function createQuickDraft(
     edges: [],
     applications,
     tags,
-    sourceLabels: ["Knowledge"],
+    sources: [
+      {
+        kind: "internal",
+        providerType: "dejaview",
+        label: "Created in DejaView",
+        providerLabel: null,
+        externalKey: null,
+        externalUrl: null,
+        sourceTitle: "Created in DejaView",
+        capturedAt: context.now,
+      },
+    ],
   };
 }
 

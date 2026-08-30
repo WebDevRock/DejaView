@@ -66,7 +66,7 @@ export function JiraActions({ issueKey }: { issueKey: string }) {
           onClick={promote}
           disabled={loading !== null}
         >
-          {loading === "promote" ? "Creating draft…" : "Promote to draft"}
+          {loading === "promote" ? "Importing…" : "Import to knowledge"}
         </button>
         <button
           className="rounded border px-4 py-2 disabled:opacity-60"

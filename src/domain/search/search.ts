@@ -1,5 +1,5 @@
-export type SearchSource = "knowledge" | "support_case" | "external" | string;
-export type SearchKind = "article" | "support_case" | "external";
+export type SearchSource = "knowledge" | "external" | string;
+export type SearchKind = "article" | "external";
 
 export interface SearchQuery {
   text: string;
@@ -8,7 +8,7 @@ export interface SearchQuery {
   tag?: string;
   dateFrom?: string;
   dateTo?: string;
-  status?: "published" | "resolved";
+  status?: "published";
   limit?: number;
   cursor?: string;
 }
