@@ -158,9 +158,7 @@ export class JiraCloudProvider implements KnowledgeSourceProvider {
       id: `${this.id}:${key}`,
       externalKey: key,
       title: fields.summary,
-      snippet: [fields.project?.name, fields.issuetype?.name]
-        .filter(Boolean)
-        .join(" · "),
+      snippet: fields.issuetype?.name ?? "",
       url: `${this.config.baseUrl}/browse/${encodeURIComponent(key)}`,
       sourceId: this.id,
       sourceLabel: this.label,

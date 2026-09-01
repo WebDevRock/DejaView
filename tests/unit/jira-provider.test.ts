@@ -252,6 +252,8 @@ describe("Jira Cloud provider", () => {
     expect(results[0]).toMatchObject({
       status: "open",
       displayStatus: "Awaiting triage",
+      snippet: "Bug",
+      metadata: { projectKey: "SUP", projectName: "Support" },
     });
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(String(fetcher.mock.calls[0]![0])).toContain(

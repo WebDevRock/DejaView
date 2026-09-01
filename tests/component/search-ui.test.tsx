@@ -1,6 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { HomeContent, HomeKnowledgeCards } from "@/app/page";
+import { ProjectPill } from "@/presentation/components/project-pill";
 import { SearchResults } from "@/presentation/components/search-results";
 import {
   SearchControls,
@@ -39,6 +40,61 @@ describe("search interface", () => {
     expect(screen.getByText("Knowledge")).toBeInTheDocument();
 
     expect(screen.getByText("Replace cable")).toBeInTheDocument();
+  });
+
+  it("shows Jira project titles as stable project-coloured pills", () => {
+    render(
+      <SearchResults
+        results={[
+          {
+            id: "jira:SUP-42",
+            kind: "external",
+            title: "Investigate payroll queue",
+            snippet: "Incident",
+            url: "/providers/jira/issues/SUP-42",
+            sourceLabel: "Jira",
+            status: "open",
+            score: 1,
+            exactMatch: false,
+            updatedAt: "2026-08-28T00:00:00.000Z",
+            metadata: { projectKey: "SUP", projectName: "Payroll" },
+          },
+          {
+            id: "jira:OPS-7",
+            kind: "external",
+            title: "Restore deployment",
+            snippet: "Task",
+            url: "/providers/jira/issues/OPS-7",
+            sourceLabel: "Jira",
+            status: "open",
+            score: 0.5,
+            exactMatch: false,
+            updatedAt: "2026-08-27T00:00:00.000Z",
+            metadata: { projectKey: "OPS", projectName: "Operations" },
+          },
+        ]}
+      />,
+    );
+
+    const payroll = screen.getByText("Payroll");
+    const operations = screen.getByText("Operations");
+    expect(payroll).toHaveAttribute("data-project-key", "SUP");
+    expect(payroll.className).toContain("rounded-full");
+    expect(operations).toHaveAttribute("data-project-key", "OPS");
+    expect(operations.className).toContain("rounded-full");
+    expect(payroll.getAttribute("style")).not.toBe(
+      operations.getAttribute("style"),
+    );
+  });
+
+  it("keeps a Jira project's pill colour stable and falls back to its key", () => {
+    const { rerender } = render(
+      <ProjectPill projectKey="SUP" projectName="Support" />,
+    );
+    const originalStyle = screen.getByText("Support").getAttribute("style");
+
+    rerender(<ProjectPill projectKey="sup" projectName=" " />);
+    expect(screen.getByText("sup").getAttribute("style")).toBe(originalStyle);
   });
 
   it("offers every search filter and retains them in pagination", () => {

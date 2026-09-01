@@ -22,7 +22,7 @@ app and infrastructure -> application -> domain
 
 ## Knowledge model
 
-Everything stored locally for users to read is a knowledge article. There is no runtime support-case domain, table, repository, service, route, page or search kind.
+Everything stored locally for users to read is a knowledge article. The runtime model contains only knowledge articles and external provider results.
 
 - `knowledge_articles` stores stable identity, authoring fields, lifecycle (`draft`, `published`, `deprecated`, `archived`), optimistic version, use count and actor/timestamp metadata.
 - `knowledge_steps` stores ordered, stable steps and safe AST/plain-text projections.
