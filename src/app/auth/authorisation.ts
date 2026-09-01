@@ -17,17 +17,26 @@ export class AuthorisationError extends Error {
 }
 
 export const localIdentityProvider: IdentityProvider = {
-  resolve: async () => localActor(),
+  resolve: async () => {
+    const local = localActor();
+    if (local) return local;
+    if (
+      process.env.NODE_ENV === "test" ||
+      !process.env.AUTH_MICROSOFT_ENTRA_ID_ID
+    )
+      return null;
+    const { auth, actorFromSession } = await import("../../auth");
+    return actorFromSession(await auth());
+  },
 };
 
 function enforceSameOrigin(request: Request): void {
   const origin = request.headers.get("origin");
-  const requestUrl = new URL(request.url);
-  const host = request.headers.get("host");
-  const browserFacingOrigin = host
-    ? `${requestUrl.protocol}//${host}`
-    : requestUrl.origin;
-  if (origin && origin !== browserFacingOrigin)
+  const configuredOrigin = process.env.AUTH_URL?.trim();
+  const expectedOrigin = configuredOrigin
+    ? new URL(configuredOrigin).origin
+    : new URL(request.url).origin;
+  if (origin && new URL(origin).origin !== expectedOrigin)
     throw new AuthorisationError(
       "cross_origin",
       "Cross-origin mutations are not permitted",

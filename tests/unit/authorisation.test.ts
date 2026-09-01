@@ -14,6 +14,7 @@ const request = new Request("https://dejaview.example/api/v1/articles/quick", {
 
 afterEach(() => {
   delete process.env.DEJAVIEW_LOCAL_AUTH;
+  delete process.env.AUTH_URL;
 });
 
 describe("mutation authorisation", () => {
@@ -47,6 +48,7 @@ describe("mutation authorisation", () => {
     ).rejects.toMatchObject({ code: "cross_origin", status: 403 });
   });
   it("uses the forwarded browser-facing origin behind the application server", async () => {
+    process.env.AUTH_URL = "https://dejaview.example.com";
     const provider: IdentityProvider = {
       resolve: async () => ({
         id: "00000000-0000-4000-8000-000000000002",
@@ -59,7 +61,7 @@ describe("mutation authorisation", () => {
       {
         method: "POST",
         headers: {
-          origin: "http://127.0.0.1:3000",
+          origin: "https://dejaview.example.com",
           host: "127.0.0.1:3000",
         },
       },

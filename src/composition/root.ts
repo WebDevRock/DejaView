@@ -45,6 +45,33 @@ export function jiraPromotionService() {
     new SqliteExternalPromotionRepository(database(), knowledgeService()),
   ));
 }
+export function ensureActorUser(actor: {
+  id: string;
+  displayName: string;
+  email?: string | null;
+}): void {
+  const connection = database();
+  const now = new Date().toISOString();
+  connection.db
+    .insert(users)
+    .values({
+      id: actor.id,
+      externalSubject: `entra:${actor.id}`,
+      displayName: actor.displayName,
+      email: actor.email ?? null,
+      status: "active",
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: users.id,
+      set: {
+        displayName: actor.displayName,
+        updatedAt: now,
+      },
+    })
+    .run();
+}
 function database() {
   if (connection) return connection;
   connection = openDatabase();
