@@ -63,19 +63,23 @@ export function errorResponse(error: unknown): NextResponse {
     const status =
       error.code === "not_found"
         ? 404
-        : error.code === "invalid_request"
-          ? 400
-          : error.code === "rate_limited"
-            ? 503
-            : error.code === "timeout"
-              ? 504
-              : 502;
+        : error.code === "promotion_conflict"
+          ? 409
+          : error.code === "invalid_request"
+            ? 400
+            : error.code === "rate_limited"
+              ? 503
+              : error.code === "timeout"
+                ? 504
+                : 502;
     return NextResponse.json(
       {
         error: {
           code: error.code,
           message:
-            "The external knowledge source request could not be completed",
+            error.code === "promotion_conflict"
+              ? "Selected comments cannot be added to an existing draft"
+              : "The external knowledge source request could not be completed",
           requestId,
         },
       },

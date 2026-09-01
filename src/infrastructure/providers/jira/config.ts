@@ -12,9 +12,34 @@ const schema = z
       .array(z.string().regex(/^[A-Z][A-Z0-9_]{0,19}$/))
       .min(1)
       .max(50),
+    projectColours: z
+      .record(
+        z.string().regex(/^[A-Z][A-Z0-9_]{0,19}$/),
+        z.string().regex(/^#[0-9A-F]{6}$/),
+      )
+      .default({}),
     timeoutMs: z.number().int().min(100).max(30_000).default(5_000),
   })
-  .strict();
+  .strict()
+  .superRefine((config, context) => {
+    const colourKeys = Object.keys(config.projectColours);
+    if (colourKeys.length > 50)
+      context.addIssue({
+        code: "too_big",
+        origin: "object",
+        maximum: 50,
+        inclusive: true,
+        path: ["projectColours"],
+        message: "Too many Jira project colours",
+      });
+    for (const key of colourKeys)
+      if (!config.projectKeys.includes(key))
+        context.addIssue({
+          code: "custom",
+          path: ["projectColours", key],
+          message: "Jira project colour key must be allow-listed",
+        });
+  });
 export type JiraConfiguration = z.infer<typeof schema>;
 
 export function parseJiraConfiguration(value: unknown): JiraConfiguration {
@@ -54,8 +79,27 @@ export function jiraConfigurationFromEnvironment(
       .split(",")
       .map((key) => key.trim())
       .filter(Boolean),
+    projectColours: parseProjectColours(environment.JIRA_PROJECT_COLOURS),
     timeoutMs: environment.JIRA_TIMEOUT_MS
       ? Number(environment.JIRA_TIMEOUT_MS)
       : 5_000,
   });
+}
+
+function parseProjectColours(
+  value: string | undefined,
+): Record<string, string> {
+  if (!value) return {};
+  const entries = value.split(",").map((entry) => entry.trim());
+  const colours: Record<string, string> = {};
+  for (const entry of entries) {
+    const separator = entry.indexOf(":");
+    const key = separator < 0 ? entry : entry.slice(0, separator);
+    const colour =
+      separator < 0 ? "" : entry.slice(separator + 1).toUpperCase();
+    if (Object.hasOwn(colours, key))
+      throw new Error(`Duplicate Jira project colour: ${key}`);
+    colours[key] = colour;
+  }
+  return colours;
 }

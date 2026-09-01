@@ -57,7 +57,11 @@ describe("search interface", () => {
             score: 1,
             exactMatch: false,
             updatedAt: "2026-08-28T00:00:00.000Z",
-            metadata: { projectKey: "SUP", projectName: "Payroll" },
+            metadata: {
+              projectKey: "SUP",
+              projectName: "Payroll",
+              projectColour: "#2563EB",
+            },
           },
           {
             id: "jira:OPS-7",
@@ -80,6 +84,9 @@ describe("search interface", () => {
     const operations = screen.getByText("Operations");
     expect(payroll).toHaveAttribute("data-project-key", "SUP");
     expect(payroll.className).toContain("rounded-full");
+    expect(payroll.style.backgroundColor).toBe("rgb(233, 239, 253)");
+    expect(payroll.style.borderColor).toBe("rgb(179, 200, 248)");
+    expect(payroll.style.color).toBe("rgb(13, 35, 82)");
     expect(operations).toHaveAttribute("data-project-key", "OPS");
     expect(operations.className).toContain("rounded-full");
     expect(payroll.getAttribute("style")).not.toBe(
@@ -95,6 +102,32 @@ describe("search interface", () => {
 
     rerender(<ProjectPill projectKey="sup" projectName=" " />);
     expect(screen.getByText("sup").getAttribute("style")).toBe(originalStyle);
+  });
+
+  it("uses an explicit safe colour and rejects arbitrary CSS values", () => {
+    const { rerender } = render(
+      <ProjectPill projectKey="SUP" projectName="Support" colour="#2563EB" />,
+    );
+    const explicitStyle = screen.getByText("Support").getAttribute("style");
+    expect(screen.getByText("Support").style.backgroundColor).toBe(
+      "rgb(233, 239, 253)",
+    );
+
+    rerender(
+      <ProjectPill
+        projectKey="SUP"
+        projectName="Support"
+        colour="red;display:none"
+      />,
+    );
+    expect(screen.getByText("Support").getAttribute("style")).not.toBe(
+      explicitStyle,
+    );
+
+    rerender(<ProjectPill projectKey="SUP" projectName="Support" />);
+    expect(screen.getByText("Support").getAttribute("style")).not.toBe(
+      explicitStyle,
+    );
   });
 
   it("offers every search filter and retains them in pagination", () => {

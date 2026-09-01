@@ -20,16 +20,19 @@ The Phase 1 Jira Cloud adapter has one canonical identity:
 
 Jira is optional. If `JIRA_BASE_URL` is absent, no Jira provider is registered. If it is present, configuration is strict and all required values must be valid.
 
-| Variable            | Requirement                                                                                                                  |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `JIRA_BASE_URL`     | Required to enable Jira. Origin-only `https://<tenant>.atlassian.net`; no credentials, custom port, path, query or fragment. |
-| `JIRA_EMAIL`        | Required. Valid email for a least-privileged Jira service account.                                                           |
-| `JIRA_API_TOKEN`    | Required. Non-empty server-side secret.                                                                                      |
-| `JIRA_PROJECT_KEYS` | Required. Comma-separated allow-list of 1–50 uppercase Jira project keys matching `[A-Z][A-Z0-9_]{0,19}`.                    |
-| `JIRA_SOURCE_LABEL` | Optional display label, 1–100 characters; defaults to `Jira`.                                                                |
-| `JIRA_TIMEOUT_MS`   | Optional integer from 100 to 30,000 milliseconds; defaults to `5000`.                                                        |
+| Variable               | Requirement                                                                                                                                                                                                                                |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `JIRA_BASE_URL`        | Required to enable Jira. Origin-only `https://<tenant>.atlassian.net`; no credentials, custom port, path, query or fragment.                                                                                                               |
+| `JIRA_EMAIL`           | Required. Valid email for a least-privileged Jira service account.                                                                                                                                                                         |
+| `JIRA_API_TOKEN`       | Required. Non-empty server-side secret.                                                                                                                                                                                                    |
+| `JIRA_PROJECT_KEYS`    | Required. Comma-separated allow-list of 1–50 uppercase Jira project keys matching `[A-Z][A-Z0-9_]{0,19}`.                                                                                                                                  |
+| `JIRA_PROJECT_COLOURS` | Optional comma-separated pill colours, for example `SUP:#2563EB,OPS:#059669`. Up to 50 unique, canonical uppercase keys are allowed; every key must occur in `JIRA_PROJECT_KEYS` and every value must be a six-digit `#RRGGBB` hex colour. |
+| `JIRA_SOURCE_LABEL`    | Optional display label, 1–100 characters; defaults to `Jira`.                                                                                                                                                                              |
+| `JIRA_TIMEOUT_MS`      | Optional integer from 100 to 30,000 milliseconds; defaults to `5000`.                                                                                                                                                                      |
 
 Keep credentials in the process environment or a secret manager. Never put real values in `.env.example`, source control, database configuration, browser bundles, screenshots, URLs or logs.
+
+`JIRA_PROJECT_COLOURS` is non-secret presentation configuration. DejaView validates it on the server, exposes only the matched safe hex value as issue metadata, and derives a light background, border and high-contrast dark text for the pill. Projects without a configured colour retain the deterministic project-key colour.
 
 ## Allowed projects and JQL
 
@@ -59,7 +62,9 @@ The search result is deliberately lightweight. Opening a result lazily fetches t
 - `includeComments=true` opts into comment retrieval;
 - pages contain at most 50 comments and use a numeric cursor bounded by the adapter;
 - comments are rendered through the same safe AST pipeline;
-- comments are for reference in the detail view only and are **not** included in a promoted article or provenance snapshot.
+- comments remain unselected by default. An editor may explicitly select up to 20 and map each to supporting context or an instruction step;
+- promotion re-fetches selected comment IDs from at most ten authoritative Jira pages and never trusts browser-supplied comment text;
+- every selected comment is recorded in the internal provenance snapshot with its ID and mapping. Unselected comments are not persisted.
 
 ## Promotion is a snapshot, not synchronisation
 
@@ -69,9 +74,9 @@ An editor or administrator can explicitly promote an allowed Jira issue from a s
 2. creates a local **Draft** article with generic, provider-neutral provenance;
 3. records source ID, external key, exact validated canonical issue URL, configured source label, title, capture time and sanitised description plain text (up to the application limit);
 4. stores only the name `JIRA_API_TOKEN` as `secret_env_ref`, never the token value;
-5. returns the existing linked draft on repeated promotion rather than creating a duplicate.
+5. returns the existing linked draft on a repeated issue-only promotion. A repeated request with selected comments is rejected because it cannot truthfully apply them to an existing draft.
 
-The user must review, complete and publish the draft separately. Promotion does not copy comments and establishes no subscription. There is no background, scheduled, webhook-driven or bidirectional synchronisation: later Jira edits do not alter local knowledge, and DejaView does not edit Jira.
+The user must review, complete and publish the draft separately. Comment import is explicit per comment and establishes no subscription. There is no background, scheduled, webhook-driven or bidirectional synchronisation: later Jira edits do not alter local knowledge, and DejaView does not edit Jira.
 
 ## HTTP surface and user flow
 

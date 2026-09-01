@@ -1,14 +1,21 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { ProviderCommentPage } from "../../domain/sources/provider";
+import type {
+  ProviderCommentMapping,
+  ProviderCommentPage,
+} from "../../domain/sources/provider";
 import { SafeContent } from "./safe-content";
 
 export function JiraActions({ issueKey }: { issueKey: string }) {
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [comments, setComments] = useState<ProviderCommentPage | null>(null);
+  const [selected, setSelected] = useState<
+    Record<string, ProviderCommentMapping>
+  >({});
   const [loading, setLoading] = useState<"promote" | "comments" | null>(null);
+  const selectedCount = Object.keys(selected).length;
 
   async function promote() {
     setLoading("promote");
@@ -19,12 +26,21 @@ export function JiraActions({ issueKey }: { issueKey: string }) {
         {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: "{}",
+          body: JSON.stringify({
+            comments: Object.entries(selected).map(([id, mapping]) => ({
+              id,
+              mapping,
+            })),
+          }),
         },
       );
       const body = await safeJson(response);
       const articleId = articleIdFrom(body);
       if (response.ok && articleId) router.push(`/knowledge/${articleId}/edit`);
+      else if (errorCodeFrom(body) === "promotion_conflict")
+        setMessage(
+          "This Jira issue already has a draft. Selected comments were not added; open the existing draft without selections instead.",
+        );
       else setMessage("The Jira draft could not be created. Please try again.");
     } catch {
       setMessage("The Jira draft could not be created. Please try again.");
@@ -51,6 +67,7 @@ export function JiraActions({ issueKey }: { issueKey: string }) {
             }
           : page,
       );
+      if (!cursor) setSelected({});
     } catch {
       setMessage("Jira comments could not be loaded. Please try again.");
     } finally {
@@ -84,11 +101,54 @@ export function JiraActions({ issueKey }: { issueKey: string }) {
       {comments && (
         <div className="mt-6">
           <h2 className="text-xl font-semibold">Comments</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            {selectedCount} of 20 comments selected
+          </p>
           {comments.comments.map((comment) => (
             <article
               key={comment.id}
               className="mt-3 rounded border bg-white p-4"
             >
+              <div className="mb-2 flex flex-wrap items-center gap-3">
+                <label className="font-semibold">
+                  <input
+                    type="checkbox"
+                    className="mr-2"
+                    checked={comment.id in selected}
+                    disabled={!(comment.id in selected) && selectedCount >= 20}
+                    onChange={(event) =>
+                      setSelected((current) => {
+                        if (event.target.checked)
+                          return { ...current, [comment.id]: "context" };
+                        const next = { ...current };
+                        delete next[comment.id];
+                        return next;
+                      })
+                    }
+                  />
+                  Import comment {comment.id} by {comment.author},{" "}
+                  {comment.createdAt}
+                </label>
+                <label>
+                  Mapping for comment {comment.id} by {comment.author},{" "}
+                  {comment.createdAt}
+                  <select
+                    className="ml-2 rounded border px-2 py-1"
+                    value={selected[comment.id] ?? "context"}
+                    disabled={!(comment.id in selected)}
+                    onChange={(event) =>
+                      setSelected((current) => ({
+                        ...current,
+                        [comment.id]: event.target
+                          .value as ProviderCommentMapping,
+                      }))
+                    }
+                  >
+                    <option value="context">Context</option>
+                    <option value="step">Instruction step</option>
+                  </select>
+                </label>
+              </div>
               <p className="text-sm font-semibold">{comment.author}</p>
               <SafeContent nodes={comment.content} />
             </article>
@@ -121,6 +181,13 @@ function articleIdFrom(value: unknown): string | null {
   const data = value.data;
   if (!data || typeof data !== "object" || !("articleId" in data)) return null;
   return typeof data.articleId === "string" ? data.articleId : null;
+}
+
+function errorCodeFrom(value: unknown): string | null {
+  if (!value || typeof value !== "object" || !("error" in value)) return null;
+  const error = value.error;
+  if (!error || typeof error !== "object" || !("code" in error)) return null;
+  return typeof error.code === "string" ? error.code : null;
 }
 
 function commentPageFrom(value: unknown): ProviderCommentPage | null {

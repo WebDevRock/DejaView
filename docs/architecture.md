@@ -81,7 +81,7 @@ The repository safely compiles user text, excludes non-published local articles,
 
 ## Jira adapter and promotion
 
-The Jira adapter validates an `*.atlassian.net` HTTPS origin and allow-listed project/issue keys, builds escaped JQL from typed filters, rejects redirects, bounds request time/size, sanitises errors and converts ADF to an allow-listed AST. Detail and comments load lazily; comments are never included in promotion snapshots.
+The Jira adapter validates an `*.atlassian.net` HTTPS origin and allow-listed project/issue keys, builds escaped JQL from typed filters, rejects redirects, bounds request time/size, sanitises errors and converts ADF to an allow-listed AST. Detail and comments load lazily. Comments remain unselected by default; an editor can explicitly map up to 20 selected comments to context or instruction steps. Promotion re-fetches their IDs from no more than ten Jira pages, and the internal snapshot identifies every selected comment and mapping while excluding unselected comments.
 
 Promotion refetches the issue, creates one local Draft article, records exact source provenance and returns the existing article on duplicate `(external_source_id, external_item_key)`. It is a snapshot, not synchronisation: Jira remains authoritative for live data, but later Jira edits do not silently modify the imported article. DejaView does not edit Jira.
 

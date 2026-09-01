@@ -5,10 +5,12 @@ import { ProjectPill } from "./project-pill";
 function jiraProject(result: SearchResult) {
   const projectKey = result.metadata.projectKey;
   const projectName = result.metadata.projectName;
+  const projectColour = result.metadata.projectColour;
   if (result.kind !== "external" || typeof projectKey !== "string") return null;
   return {
     projectKey,
     projectName: typeof projectName === "string" ? projectName : null,
+    colour: typeof projectColour === "string" ? projectColour : null,
   };
 }
 

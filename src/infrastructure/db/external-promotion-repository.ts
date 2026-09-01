@@ -5,9 +5,11 @@ import type {
 } from "../../application/sources/promote-external-item";
 import type { KnowledgeService } from "../../application/articles/knowledge-service";
 import type { ActorIdentity } from "../../domain/identity/actor";
-import type {
-  ProviderItem,
-  ProviderProvenance,
+import {
+  ProviderError,
+  type ProviderItem,
+  type ProviderProvenance,
+  type SelectedProviderComment,
 } from "../../domain/sources/provider";
 import type { DatabaseConnection } from "./client";
 import { externalSourceLabel } from "./external-source-label";
@@ -17,10 +19,22 @@ export class SqliteExternalPromotionRepository implements ExternalPromotionRepos
     private readonly connection: DatabaseConnection,
     private readonly knowledge: KnowledgeService,
   ) {}
+  findExisting(
+    sourceId: string,
+    externalKey: string,
+  ): ExternalPromotionResult | null {
+    const existing = this.connection.sqlite
+      .prepare(
+        `SELECT article_id AS articleId FROM knowledge_source_links WHERE source_kind = 'external' AND external_source_id = ? AND external_item_key = ?`,
+      )
+      .get(sourceId, externalKey) as { articleId: string } | undefined;
+    return existing ? { articleId: existing.articleId, duplicate: true } : null;
+  }
   promote(
     item: ProviderItem,
     actor: ActorIdentity,
     provenance: ProviderProvenance,
+    comments: readonly SelectedProviderComment[],
   ): ExternalPromotionResult {
     return this.connection.sqlite.transaction(() => {
       const existing = this.connection.sqlite
@@ -29,7 +43,15 @@ export class SqliteExternalPromotionRepository implements ExternalPromotionRepos
         )
         .get(item.sourceId, item.externalKey) as
         { articleId: string } | undefined;
-      if (existing) return { articleId: existing.articleId, duplicate: true };
+      if (existing) {
+        if (comments.length > 0)
+          throw new ProviderError(
+            "promotion_conflict",
+            false,
+            "Selected comments cannot be added to an existing Jira draft",
+          );
+        return { articleId: existing.articleId, duplicate: true };
+      }
       const now = new Date().toISOString();
       this.connection.sqlite
         .prepare(
@@ -59,10 +81,22 @@ export class SqliteExternalPromotionRepository implements ExternalPromotionRepos
           : typeof item.metadata.projectKey === "string"
             ? item.metadata.projectKey
             : undefined;
-      const problem = [item.title, item.plainText]
-        .filter(Boolean)
-        .join("\n\n")
-        .slice(0, 20_000);
+      const contextComments = comments
+        .filter((comment) => comment.mapping === "context")
+        .map(formatContextComment);
+      const problem = joinSections(
+        [item.title, item.plainText, ...contextComments].filter(Boolean),
+      );
+      const snapshot = joinSections([
+        item.plainText,
+        ...comments.map(formatSnapshotComment),
+      ]);
+      if (problem.length > 20_000 || snapshot.length > 20_000)
+        throw new ProviderError(
+          "invalid_request",
+          false,
+          "Selected Jira content exceeds the import limit",
+        );
       const created = this.knowledge.quickCreate(
         {
           problem,
@@ -80,7 +114,19 @@ export class SqliteExternalPromotionRepository implements ExternalPromotionRepos
           problem,
           symptoms: "",
           resolutionSummary: created.resolutionSummary,
-          steps: created.steps,
+          steps: [
+            ...created.steps,
+            ...comments
+              .filter((comment) => comment.mapping === "step")
+              .map((comment, index) => ({
+                position: created.steps.length + index,
+                stepType: "instruction" as const,
+                title: commentLabel(comment),
+                instruction: sanitisePlainText(comment.plainText),
+                code: null,
+                notes: null,
+              })),
+          ],
           edges: [],
           applications: project ? [project] : [],
           tags: [],
@@ -104,7 +150,7 @@ export class SqliteExternalPromotionRepository implements ExternalPromotionRepos
           item.url,
           item.title,
           now,
-          item.plainText.slice(0, 20_000),
+          snapshot,
           now,
         );
       this.connection.sqlite
@@ -115,4 +161,31 @@ export class SqliteExternalPromotionRepository implements ExternalPromotionRepos
       return { articleId: article.id, duplicate: false };
     })();
   }
+}
+
+function sanitisePlainText(value: string): string {
+  return value
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function commentLabel(comment: SelectedProviderComment): string {
+  const author = sanitisePlainText(comment.author).slice(0, 200) || "Unknown";
+  const createdAt = sanitisePlainText(comment.createdAt).slice(0, 50);
+  return `Jira comment by ${author}${createdAt ? ` (${createdAt})` : ""}`;
+}
+
+function formatContextComment(comment: SelectedProviderComment): string {
+  return `${commentLabel(comment)}:\n${sanitisePlainText(comment.plainText)}`;
+}
+
+function formatSnapshotComment(comment: SelectedProviderComment): string {
+  return `[Jira comment ${comment.id}; mapping=${comment.mapping}]\n${formatContextComment(comment)}`;
+}
+
+function joinSections(sections: readonly string[]): string {
+  return sections.filter(Boolean).join("\n\n");
 }

@@ -5,7 +5,10 @@ import {
   parseJiraAdf,
 } from "@/infrastructure/providers/jira/adf";
 import { buildJiraJql } from "@/infrastructure/providers/jira/jql";
-import { parseJiraConfiguration } from "@/infrastructure/providers/jira/config";
+import {
+  jiraConfigurationFromEnvironment,
+  parseJiraConfiguration,
+} from "@/infrastructure/providers/jira/config";
 import { JiraCloudProvider } from "@/infrastructure/providers/jira/provider";
 import { ProviderError } from "@/domain/sources/provider";
 
@@ -16,6 +19,7 @@ const config = {
   email: "support@example.test",
   apiToken: "top-secret-token",
   projectKeys: ["SUP"],
+  projectColours: { SUP: "#2563EB" },
   timeoutMs: 100,
 };
 
@@ -181,6 +185,77 @@ describe("Jira configuration", () => {
       parseJiraConfiguration({ ...config, sourceId: "support-jira" }),
     ).toThrow();
   });
+
+  it("parses optional project colours from the environment", () => {
+    const environment = {
+      NODE_ENV: "test",
+      JIRA_BASE_URL: config.baseUrl,
+      JIRA_EMAIL: config.email,
+      JIRA_API_TOKEN: config.apiToken,
+      JIRA_PROJECT_KEYS: "SUP,OPS",
+      JIRA_PROJECT_COLOURS: "SUP:#2563EB,OPS:#059a6b",
+    } as NodeJS.ProcessEnv;
+
+    expect(
+      jiraConfigurationFromEnvironment(environment)?.projectColours,
+    ).toEqual({
+      SUP: "#2563EB",
+      OPS: "#059A6B",
+    });
+    expect(
+      jiraConfigurationFromEnvironment({
+        ...environment,
+        JIRA_PROJECT_COLOURS: undefined,
+      }),
+    ).toMatchObject({ projectColours: {} });
+  });
+
+  it("allows at most 50 project colour entries", () => {
+    const projectKeys = Array.from({ length: 50 }, (_, index) => `P${index}`);
+    const environment = {
+      NODE_ENV: "test",
+      JIRA_BASE_URL: config.baseUrl,
+      JIRA_EMAIL: config.email,
+      JIRA_API_TOKEN: config.apiToken,
+      JIRA_PROJECT_KEYS: projectKeys.join(","),
+      JIRA_PROJECT_COLOURS: projectKeys
+        .map((key) => `${key}:#2563EB`)
+        .join(","),
+    } as NodeJS.ProcessEnv;
+
+    expect(
+      Object.keys(
+        jiraConfigurationFromEnvironment(environment)!.projectColours,
+      ),
+    ).toHaveLength(50);
+    expect(() =>
+      jiraConfigurationFromEnvironment({
+        ...environment,
+        JIRA_PROJECT_KEYS: `${environment.JIRA_PROJECT_KEYS},P50`,
+        JIRA_PROJECT_COLOURS: `${environment.JIRA_PROJECT_COLOURS},P50:#2563EB`,
+      }),
+    ).toThrow();
+  });
+
+  it.each([
+    ["lowercase key", "sup:#2563EB"],
+    ["unknown key", "DEV:#2563EB"],
+    ["duplicate key", "SUP:#2563EB,SUP:#059669"],
+    ["short hex", "SUP:#123"],
+    ["arbitrary CSS", "SUP:red"],
+    ["trailing entry", "SUP:#2563EB,"],
+  ])("rejects an invalid project colour %s", (_description, projectColours) => {
+    expect(() =>
+      jiraConfigurationFromEnvironment({
+        NODE_ENV: "test",
+        JIRA_BASE_URL: config.baseUrl,
+        JIRA_EMAIL: config.email,
+        JIRA_API_TOKEN: config.apiToken,
+        JIRA_PROJECT_KEYS: "SUP,OPS",
+        JIRA_PROJECT_COLOURS: projectColours,
+      }),
+    ).toThrow();
+  });
 });
 
 describe("Jira Cloud provider", () => {
@@ -253,7 +328,11 @@ describe("Jira Cloud provider", () => {
       status: "open",
       displayStatus: "Awaiting triage",
       snippet: "Bug",
-      metadata: { projectKey: "SUP", projectName: "Support" },
+      metadata: {
+        projectKey: "SUP",
+        projectName: "Support",
+        projectColour: "#2563EB",
+      },
     });
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(String(fetcher.mock.calls[0]![0])).toContain(

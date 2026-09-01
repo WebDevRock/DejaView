@@ -63,25 +63,26 @@ The application also runs pending migrations when it first opens the database. R
 
 ## Environment variables
 
-| Variable                            | Required             | Purpose                                                                                                                                    |
-| ----------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DATABASE_URL`                      | No                   | SQLite file path; defaults to `./data/dejaview.sqlite`. Relative paths resolve from the project root.                                      |
-| `DEJAVIEW_LOCAL_AUTH`               | Local mutations only | Set exactly `true` to use the seeded editor outside production. Leave `false` in shared or production environments.                        |
-| `DEJAVIEW_CURSOR_SECRET`            | Production           | Secret used to sign search cursors. Production search fails without it. Use a long random value supplied by the deployment secret manager. |
-| `AUTH_SECRET`                       | Production           | At least 32 random bytes used to encrypt and sign authentication cookies.                                                                  |
-| `AUTH_URL`                          | Production           | Public origin, for example `https://dejaview.example.com`.                                                                                 |
-| `AUTH_MICROSOFT_ENTRA_ID_ID`        | Production           | Entra application (client) ID.                                                                                                             |
-| `AUTH_MICROSOFT_ENTRA_ID_SECRET`    | Production           | Entra client secret value.                                                                                                                 |
-| `AUTH_MICROSOFT_ENTRA_ID_TENANT_ID` | Production           | Microsoft Entra tenant ID; DejaView is single-tenant.                                                                                      |
-| `DEJAVIEW_ENTRA_READER_GROUP_ID`    | Production           | Entra object ID of the synchronised AD reader group.                                                                                       |
-| `DEJAVIEW_ENTRA_EDITOR_GROUP_ID`    | Production           | Entra object ID of the synchronised AD editor group.                                                                                       |
-| `DEJAVIEW_ENTRA_ADMIN_GROUP_ID`     | Production           | Entra object ID of the synchronised AD administrator group.                                                                                |
-| `JIRA_BASE_URL`                     | Jira only            | Origin-only `https://<tenant>.atlassian.net` URL. Supplying it enables Jira configuration validation.                                      |
-| `JIRA_EMAIL`                        | Jira only            | Email address of the least-privileged Jira service account.                                                                                |
-| `JIRA_API_TOKEN`                    | Jira only            | Jira API token; server-side secret.                                                                                                        |
-| `JIRA_PROJECT_KEYS`                 | Jira only            | Comma-separated uppercase project-key allow-list, for example `SUP,OPS`.                                                                   |
-| `JIRA_SOURCE_LABEL`                 | No                   | Display label for Jira results; defaults to `Jira`. It does not change canonical source identity.                                          |
-| `JIRA_TIMEOUT_MS`                   | No                   | Per-request timeout from 100 to 30,000 ms; defaults to `5000`.                                                                             |
+| Variable                            | Required             | Purpose                                                                                                                                                            |
+| ----------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL`                      | No                   | SQLite file path; defaults to `./data/dejaview.sqlite`. Relative paths resolve from the project root.                                                              |
+| `DEJAVIEW_LOCAL_AUTH`               | Local mutations only | Set exactly `true` to use the seeded editor outside production. Leave `false` in shared or production environments.                                                |
+| `DEJAVIEW_CURSOR_SECRET`            | Production           | Secret used to sign search cursors. Production search fails without it. Use a long random value supplied by the deployment secret manager.                         |
+| `AUTH_SECRET`                       | Production           | At least 32 random bytes used to encrypt and sign authentication cookies.                                                                                          |
+| `AUTH_URL`                          | Production           | Public origin, for example `https://dejaview.example.com`.                                                                                                         |
+| `AUTH_MICROSOFT_ENTRA_ID_ID`        | Production           | Entra application (client) ID.                                                                                                                                     |
+| `AUTH_MICROSOFT_ENTRA_ID_SECRET`    | Production           | Entra client secret value.                                                                                                                                         |
+| `AUTH_MICROSOFT_ENTRA_ID_TENANT_ID` | Production           | Microsoft Entra tenant ID; DejaView is single-tenant.                                                                                                              |
+| `DEJAVIEW_ENTRA_READER_GROUP_ID`    | Production           | Entra object ID of the synchronised AD reader group.                                                                                                               |
+| `DEJAVIEW_ENTRA_EDITOR_GROUP_ID`    | Production           | Entra object ID of the synchronised AD editor group.                                                                                                               |
+| `DEJAVIEW_ENTRA_ADMIN_GROUP_ID`     | Production           | Entra object ID of the synchronised AD administrator group.                                                                                                        |
+| `JIRA_BASE_URL`                     | Jira only            | Origin-only `https://<tenant>.atlassian.net` URL. Supplying it enables Jira configuration validation.                                                              |
+| `JIRA_EMAIL`                        | Jira only            | Email address of the least-privileged Jira service account.                                                                                                        |
+| `JIRA_API_TOKEN`                    | Jira only            | Jira API token; server-side secret.                                                                                                                                |
+| `JIRA_PROJECT_KEYS`                 | Jira only            | Comma-separated uppercase project-key allow-list, for example `SUP,OPS`.                                                                                           |
+| `JIRA_PROJECT_COLOURS`              | No                   | Comma-separated project pill colours, for example `SUP:#2563EB,OPS:#059669`. Keys must be unique members of `JIRA_PROJECT_KEYS`; values are six-digit hex colours. |
+| `JIRA_SOURCE_LABEL`                 | No                   | Display label for Jira results; defaults to `Jira`. It does not change canonical source identity.                                                                  |
+| `JIRA_TIMEOUT_MS`                   | No                   | Per-request timeout from 100 to 30,000 ms; defaults to `5000`.                                                                                                     |
 
 `JIRA_EMAIL`, `JIRA_API_TOKEN`, `DEJAVIEW_CURSOR_SECRET` and any real tenant details belong in `.env.local` for local work or, preferably, a deployment secret manager. Do not commit them. If `JIRA_BASE_URL` is absent, the Jira provider is simply not registered. If it is present, all required Jira values must pass strict validation.
 
@@ -116,9 +117,10 @@ For a live smoke test, supply the four required Jira values through the environm
 
 1. `/search` returns clearly labelled Jira results for an allowed project;
 2. an issue opens with a safely rendered description;
-3. comments load only after request and paginate without entering promotion data;
-4. **Promote to draft** refetches the issue, creates one local draft and opens the same draft on repetition;
-5. removing or invalidating Jira credentials leaves internal results visible with a sanitised partial-failure warning.
+3. comments load only after request and remain unselected by default;
+4. selected comments can be imported as supporting context or instruction steps, with a maximum of 20 selections and ten authoritative Jira pages checked;
+5. **Promote to draft** refetches the issue and selected comments and creates one local draft; a repeated import without comments opens the existing draft, while selected additions to an existing draft are rejected explicitly;
+6. removing or invalidating Jira credentials leaves internal results visible with a sanitised partial-failure warning.
 
 Never paste tokens into documentation, screenshots, URLs, browser code or logs. See [`docs/providers.md`](docs/providers.md) for exact constraints.
 

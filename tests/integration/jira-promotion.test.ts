@@ -32,6 +32,60 @@ afterEach(() => {
 });
 
 describe("Jira promotion", () => {
+  it("rejects selected comments when the transactional duplicate check wins a race", () => {
+    const knowledge = new KnowledgeService(
+      new SqliteKnowledgeArticleRepository(connection),
+    );
+    const repository = new SqliteExternalPromotionRepository(
+      connection,
+      knowledge,
+    );
+    const actor = {
+      id: SAMPLE_IDS.user,
+      displayName: "User",
+      role: "editor" as const,
+    };
+    const item = {
+      id: "jira:SUP-42",
+      externalKey: "SUP-42",
+      title: "Existing issue",
+      snippet: "",
+      url: "https://tenant.atlassian.net/browse/SUP-42",
+      sourceId: "jira",
+      sourceLabel: "Support Jira",
+      status: "open" as const,
+      score: 1,
+      updatedAt: "2026-08-28T10:00:00Z",
+      metadata: {},
+      content: [],
+      plainText: "Existing description",
+    };
+    const provenance = {
+      providerType: "jira",
+      secretEnvRef: "JIRA_API_TOKEN",
+      promotionGuidance: "Review the issue.",
+    };
+    const first = repository.promote(item, actor, provenance, []);
+
+    expect(() =>
+      repository.promote(item, actor, provenance, [
+        {
+          id: "101",
+          author: "Alex",
+          createdAt: "2026-08-28T11:00:00Z",
+          content: [],
+          plainText: "Selected later",
+          mapping: "context",
+        },
+      ]),
+    ).toThrowError(
+      expect.objectContaining({ code: "promotion_conflict", retryable: false }),
+    );
+    expect(knowledge.get(first.articleId)?.problem).not.toContain(
+      "Selected later",
+    );
+  });
+
   it("freshly fetches a Jira issue, creates one draft with generic provenance and excludes comments", async () => {
     let fetches = 0;
     const provider = {
@@ -176,6 +230,7 @@ describe("Jira promotion", () => {
         secretEnvRef: "TRACKER_TOKEN",
         promotionGuidance: "Verify and document the incident resolution.",
       },
+      [],
     );
     const label = () =>
       connection.sqlite
@@ -223,5 +278,102 @@ describe("Jira promotion", () => {
       .run(promoted.articleId);
     repairSearchProjection(connection.sqlite);
     expect(label()).toEqual({ source_label: "Persisted provider A" });
+  });
+
+  it("persists only selected comments as context and additional instruction steps", async () => {
+    const provider = {
+      id: "jira",
+      label: "Support Jira",
+      provenance: {
+        providerType: "jira",
+        secretEnvRef: "JIRA_API_TOKEN",
+        promotionGuidance:
+          "Review this captured Jira issue and document the verified resolution.",
+      },
+      capabilities: {
+        search: true,
+        itemDetail: true,
+        comments: true,
+        supportedFilters: ["project", "date"],
+      },
+      search: async () => [],
+      getItem: async () => ({
+        id: "jira:SUP-43",
+        externalKey: "SUP-43",
+        title: "Printer issue",
+        snippet: "",
+        url: "https://tenant.atlassian.net/browse/SUP-43",
+        sourceId: "jira",
+        sourceLabel: "Support Jira",
+        status: "open" as const,
+        score: 1,
+        updatedAt: "2026-08-28T10:00:00Z",
+        metadata: {},
+        content: [],
+        plainText: "Issue description",
+      }),
+      getComments: async () => ({
+        comments: [
+          {
+            id: "101",
+            author: "Alex<script>",
+            createdAt: "2026-08-28",
+            content: [],
+            plainText: "Context <b>detail</b>\u0000",
+          },
+          {
+            id: "102",
+            author: "Blair",
+            createdAt: "2026-08-29",
+            content: [],
+            plainText: "Restart the spooler",
+          },
+          {
+            id: "103",
+            author: "Casey",
+            createdAt: "2026-08-30",
+            content: [],
+            plainText: "Must remain absent",
+          },
+        ],
+        nextCursor: null,
+      }),
+    } satisfies KnowledgeSourceProvider;
+    const knowledge = new KnowledgeService(
+      new SqliteKnowledgeArticleRepository(connection),
+    );
+    const service = new PromoteExternalItemService(
+      provider,
+      new SqliteExternalPromotionRepository(connection, knowledge),
+    );
+    const result = await service.promote(
+      "SUP-43",
+      { id: SAMPLE_IDS.user, displayName: "User", role: "editor" },
+      [
+        { id: "101", mapping: "context" },
+        { id: "102", mapping: "step" },
+      ],
+    );
+
+    const article = knowledge.get(result.articleId)!;
+    expect(article.problem).toContain(
+      "Jira comment by Alex<script> (2026-08-28):\nContext <b>detail</b>",
+    );
+    expect(article.problem).not.toContain("Must remain absent");
+    expect(article.steps.map((step) => step.instruction)).toEqual([
+      provider.provenance.promotionGuidance,
+      "Restart the spooler",
+    ]);
+    const snapshot = connection.sqlite
+      .prepare(
+        "SELECT snapshot_text FROM knowledge_source_links WHERE article_id = ?",
+      )
+      .get(result.articleId) as { snapshot_text: string };
+    expect(snapshot.snapshot_text).toContain("Context <b>detail</b>");
+    expect(snapshot.snapshot_text).toContain("Restart the spooler");
+    expect(snapshot.snapshot_text).toContain(
+      "[Jira comment 102; mapping=step]",
+    );
+    expect(snapshot.snapshot_text).not.toContain("Must remain absent");
   });
 });

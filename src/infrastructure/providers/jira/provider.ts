@@ -169,6 +169,8 @@ export class JiraCloudProvider implements KnowledgeSourceProvider {
       metadata: {
         projectKey: fields.project?.key ?? null,
         projectName: fields.project?.name ?? null,
+        projectColour:
+          this.config.projectColours[fields.project?.key ?? ""] ?? null,
         issueType: fields.issuetype?.name ?? null,
       },
     };

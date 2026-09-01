@@ -49,14 +49,23 @@ export interface ProviderItem extends ProviderSearchResult {
   content: SafeContentNode[];
   plainText: string;
 }
+export interface ProviderComment {
+  id: string;
+  author: string;
+  createdAt: string;
+  content: SafeContentNode[];
+  plainText: string;
+}
+export type ProviderCommentMapping = "context" | "step";
+export interface ProviderCommentSelection {
+  id: string;
+  mapping: ProviderCommentMapping;
+}
+export interface SelectedProviderComment extends ProviderComment {
+  mapping: ProviderCommentMapping;
+}
 export interface ProviderCommentPage {
-  comments: {
-    id: string;
-    author: string;
-    createdAt: string;
-    content: SafeContentNode[];
-    plainText: string;
-  }[];
+  comments: ProviderComment[];
   nextCursor: string | null;
 }
 export interface KnowledgeSourceProvider {
@@ -77,6 +86,7 @@ export interface KnowledgeSourceProvider {
 }
 export type ProviderErrorCode =
   | "invalid_request"
+  | "promotion_conflict"
   | "unauthorised"
   | "forbidden"
   | "not_found"

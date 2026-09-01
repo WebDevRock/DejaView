@@ -29,6 +29,11 @@ export default async function JiraIssuePage({
                 ? issue.metadata.projectName
                 : null
             }
+            colour={
+              typeof issue.metadata.projectColour === "string"
+                ? issue.metadata.projectColour
+                : null
+            }
           />
         )}
         <span>{issue.externalKey}</span>
