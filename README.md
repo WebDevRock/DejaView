@@ -273,9 +273,55 @@ npm audit --omit=dev
 
 Playwright installs browser binaries separately when needed (`npx playwright install`). End-to-end tests start the application using their test configuration; do not point them at production data.
 
-## PostgreSQL migration seams
+## Server database migration seams
 
-SQLite is behind repository, unit-of-work and search ports. Domain/application code does not depend on SQLite row IDs or FTS rank types; UUIDs and ISO 8601 UTC strings are portable. A PostgreSQL migration would add Drizzle PostgreSQL repositories, transaction handling and a `tsvector` (or other) search adapter behind the existing contracts, migrate data, and change deployment composition. It should preserve `/api/v1`, actor, provider and provenance contracts. PostgreSQL support is a seam, not an implemented feature.
+SQLite is behind repository, unit-of-work and search ports. Domain/application code does not depend on SQLite row IDs or FTS rank types; UUIDs and ISO 8601 UTC strings are portable. PostgreSQL and Microsoft SQL Server are migration targets, not currently implemented runtime options. Setting a server connection string in the present release will not switch the application away from SQLite.
+
+### PostgreSQL
+
+A PostgreSQL migration would add Drizzle PostgreSQL schemas and repositories, asynchronous transaction handling and a `tsvector` (or other) search adapter behind the existing contracts. It must migrate and reconcile every source row before cutover while preserving `/api/v1`, actor, provider and provenance contracts.
+
+### Microsoft SQL Server
+
+SQL Server is viable, but this is an application migration rather than a connection-string-only deployment change. The present repositories, migrations and FTS5 search adapter contain SQLite-specific SQL and synchronous `better-sqlite3` calls.
+
+An implementation should:
+
+1. Add SQL Server table definitions and repositories behind the existing ports. Translate SQLite text, integer/boolean and timestamp representations deliberately to `nvarchar`, `bit` and either `datetimeoffset` or a documented ISO 8601 text representation.
+2. Replace process-local synchronous transactions with an awaited SQL Server connection pool and transactions. Keep one shared pool per Node process and use parameterised queries.
+3. Create a separate ordered, checksum-verified T-SQL migration set. Do not run the existing SQLite migration files against SQL Server and do not use `drizzle-kit push` in production.
+4. Install the SQL Server **Full-Text Search** Database Engine component and implement a SQL Server search adapter, normally using a full-text catalogue/index and `CONTAINSTABLE`. Preserve exact-term, filtering, deterministic ranking and cursor behaviour with database-specific integration tests. SQL Server and SQLite use different tokenisation and ranking, so FTS5 SQL cannot be translated mechanically.
+5. Build a repeatable SQLite-to-SQL Server transfer command that reads a consistent SQLite backup, inserts tables in foreign-key order, preserves IDs, versions, timestamps, users and provenance, and reports per-table counts and rejected rows. Do not point production at the target yet.
+6. Rebuild the SQL Server search projection, compare source and target row counts, sample complete aggregates and run API, authorisation, mutation, search and rollback tests against the target.
+7. Stop writes, take a final consistent SQLite backup, run a final incremental or full transfer, repeat reconciliation, then change the database provider and restart. Retain the SQLite backup for rollback.
+
+#### Packages
+
+Drizzle's SQL Server documentation currently uses its release-candidate channel with the `mssql` driver. The repository currently pins stable `drizzle-orm` and `drizzle-kit`, and that stable ORM package does not expose the documented `node-mssql`/`mssql-core` entry points. Implement and test the migration on a branch before changing these versions:
+
+```sh
+npm install drizzle-orm@rc mssql
+npm install --save-dev drizzle-kit@rc @types/mssql
+```
+
+The default `mssql` transport uses the cross-platform `tedious` driver and requires SQL Server TCP/IP access. If deployment specifically requires integrated authentication as the Node service identity, evaluate `mssql/msnodesqlv8` separately and install the matching Microsoft ODBC driver; do not assume IIS authentication is automatically passed to the separate Node process.
+
+#### Proposed environment variables
+
+These variables are the recommended contract for the SQL Server adapter. They are documentation for that future adapter and are not consumed by the current SQLite implementation:
+
+| Variable                         | Required for SQL Server | Purpose                                                                                                                                       |
+| -------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_PROVIDER`              | Yes                     | Set to `sqlserver`; retain `sqlite` as the default during development and migration rehearsal.                                                |
+| `DATABASE_URL`                   | Yes                     | Secret SQL Server connection string, for example `Server=tcp:sql.example.com,1433;Database=dejaview;User Id=...;Password=...;Encrypt=true`.   |
+| `DATABASE_TRUST_SERVER_CERT`     | No                      | Default `false`. Permit `true` only for a controlled local environment using a self-signed certificate, never as a production TLS workaround. |
+| `DATABASE_POOL_MAX`              | No                      | Maximum connections in the Node process pool; choose against SQL Server capacity and the number of application processes.                     |
+| `DATABASE_CONNECTION_TIMEOUT_MS` | No                      | Connection timeout in milliseconds.                                                                                                           |
+| `DATABASE_REQUEST_TIMEOUT_MS`    | No                      | Query timeout in milliseconds.                                                                                                                |
+
+Keep credentials in the deployment secret manager rather than a committed `.env` file. Use an application-specific least-privilege login, require encrypted transport, validate the SQL Server certificate and restrict network access to the application host. If the adapter uses a structured driver configuration rather than a connection string, equivalent secret variables for server, port, database, user and password may be introduced, but do not support two ambiguous configuration formats at once.
+
+References: [Drizzle SQL Server guide](https://orm.drizzle.team/docs/get-started/mssql-existing), [`node-mssql`](https://www.npmjs.com/package/mssql), [Microsoft SQL Server Full-Text Search](https://learn.microsoft.com/en-us/sql/relational-databases/search/full-text-search) and [Microsoft's Node.js connection prerequisites](https://learn.microsoft.com/en-us/sql/connect/node-js/step-3-proof-of-concept-connecting-to-sql-using-node-js).
 
 ## Non-goals
 

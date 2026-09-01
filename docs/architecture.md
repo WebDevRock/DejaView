@@ -113,7 +113,7 @@ There are no case routes. Successful API responses use `{ data, meta }`; errors 
 - Search cursors are HMAC-signed; production requires `DEJAVIEW_CURSOR_SECRET`.
 - Promoted content starts as Draft for human review.
 - Back up a consistent SQLite database/WAL/SHM set or use SQLite online backup. Applied migrations are immutable and recorded with SHA-256 checksums.
-- PostgreSQL remains an adapter seam, not an implemented feature.
+- PostgreSQL and Microsoft SQL Server remain adapter seams, not implemented runtime features. Each requires database-specific schemas, repositories, migrations, transactions, search and verified data-transfer tooling.
 
 ## Explicit non-goals
 
