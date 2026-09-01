@@ -140,16 +140,85 @@ In the Enterprise Application:
 
 DejaView checks `accountEnabled` and transitive membership of only the three configured groups through Microsoft Graph at sign-in and every five minutes thereafter. A Graph error fails closed until a successful revalidation. This supports nested synchronised AD security groups and bounds access after removal or disablement to five minutes.
 
-Generate independent secrets with `openssl rand -hex 32`. Do not reuse the Jira token or cursor secret. Nginx must pass the public host and scheme:
+Generate independent secrets with `openssl rand -hex 32`. Do not reuse the Jira token or cursor secret.
 
-```nginx
-proxy_set_header Host $host;
-proxy_set_header X-Forwarded-Host $host;
-proxy_set_header X-Forwarded-Proto https;
-proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+## Reverse proxy deployment
+
+Run the standalone Node server on a loopback address, for example `127.0.0.1:3000`, and terminate HTTPS at a trusted reverse proxy. Set `AUTH_URL` to the public HTTPS origin and `AUTH_TRUST_HOST=true`. The proxy must replace, rather than accept from an untrusted client, the effective host, scheme and client forwarding headers.
+
+Whichever proxy is used:
+
+- forward every path, including `/api/auth/*` and `/_next/*`, to the same Node process;
+- do not expose `.next/static` as an unauthenticated file alias;
+- do not publicly cache authenticated HTML, React Server Component responses or JSON;
+- allow the Auth.js callback path exactly as registered in Entra;
+- bind Node to loopback or otherwise firewall its port from client networks;
+- allow only the intended public host name at the HTTPS site or virtual host.
+
+### IIS
+
+IIS is viable using **Application Request Routing (ARR)** and **URL Rewrite 2**. Install both modules, enable **Proxy** in the server-level ARR settings, create a site with the public HTTPS binding, and use this site-level `web.config` as a starting point:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <system.webServer>
+    <rewrite>
+      <rules>
+        <rule name="DejaView reverse proxy" stopProcessing="true">
+          <match url="(.*)" />
+          <action type="Rewrite" url="http://127.0.0.1:3000/{R:1}" />
+          <serverVariables>
+            <set name="HTTP_X_FORWARDED_HOST" value="{HTTP_HOST}" />
+            <set name="HTTP_X_FORWARDED_PROTO" value="https" />
+          </serverVariables>
+        </rule>
+      </rules>
+    </rewrite>
+  </system.webServer>
+</configuration>
 ```
 
-Bind Node to loopback and reject unknown hosts at Nginx. Do not serve `.next/static` through an unauthenticated Nginx alias and do not publicly cache authenticated HTML, RSC or JSON responses.
+In IIS Manager, add `HTTP_X_FORWARDED_HOST` and `HTTP_X_FORWARDED_PROTO` to the server-level **URL Rewrite → View Server Variables** allow-list before the rule sets them. ARR supplies the forwarding proxy; the rewrite rule must target loopback and must not be configured as an open forward proxy. If TLS is terminated before IIS, set the forwarded scheme only from that trusted proxy arrangement, not from a client-supplied header.
+
+### Nginx
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+}
+```
+
+Use an exact HTTPS `server_name` and do not add a separate public `alias` for `/_next/static`.
+
+### Apache HTTP Server
+
+Apache HTTP Server 2.4 is viable with `mod_proxy`, `mod_proxy_http` and `mod_headers` enabled:
+
+```apache
+<VirtualHost *:443>
+    ServerName dejaview.example.com
+
+    SSLEngine on
+    # Configure SSLCertificateFile and SSLCertificateKeyFile here.
+
+    ProxyRequests Off
+    ProxyPreserveHost On
+    RequestHeader set X-Forwarded-Proto "https"
+
+    ProxyPass        / http://127.0.0.1:3000/ retry=0
+    ProxyPassReverse / http://127.0.0.1:3000/
+</VirtualHost>
+```
+
+`ProxyRequests Off` is important because this is a reverse proxy, not a public forward proxy. Apache's HTTP proxy module adds `X-Forwarded-Host`, while `ProxyPreserveHost On` retains the incoming `Host` header. Restrict the virtual host to the intended hostname and do not enable `mod_cache` for authenticated application responses.
+
+After configuring any proxy, verify the public origin redirects an unauthenticated page to `/auth/signin`, an unauthenticated business API returns `401`, and the Microsoft sign-in request uses the expected public HTTPS callback URI.
 
 ## Security model
 
