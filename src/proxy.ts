@@ -1,18 +1,26 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { accessDecision } from "@/app/auth/access-control";
+import { localActor } from "@/app/auth/local-actor";
 
 const isApiRequest = (pathname: string) => pathname.startsWith("/api/");
 
 export default auth((request) => {
   const pathname = request.nextUrl.pathname;
+  const actor = localActor();
   const session = request.auth
     ? {
         userId: request.auth.user.id,
         displayName: request.auth.user.name ?? "DejaView user",
         role: request.auth.user.role,
       }
-    : null;
+    : actor
+      ? {
+          userId: actor.id,
+          displayName: actor.displayName,
+          role: actor.role,
+        }
+      : null;
   const decision = accessDecision(pathname, isApiRequest(pathname), session);
 
   if (decision === "allow") return NextResponse.next();

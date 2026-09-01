@@ -33,8 +33,16 @@ test("quick creates, edits, publishes and views a knowledge article", async ({
   await expect(page).toHaveURL(/\/knowledge\/.+$/);
   await expect(page.getByText("Published", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: unique })).toBeVisible();
-  await expect(page.getByText("SELECT 1;")).toBeVisible();
-  await expect(page.getByText("Invoke-Sqlcmd -Query 'SELECT 1'")).toBeVisible();
+  const sqlStep = page.getByRole("group").filter({ hasText: "Step 1SQL" });
+  await sqlStep.locator("summary").click();
+  await expect(sqlStep.getByText("SELECT 1;")).toBeVisible();
+  const powershellStep = page
+    .getByRole("group")
+    .filter({ hasText: "Step 2PowerShell" });
+  await powershellStep.locator("summary").click();
+  await expect(
+    powershellStep.getByText("Invoke-Sqlcmd -Query 'SELECT 1'"),
+  ).toBeVisible();
   await expect(page.getByText("Payroll", { exact: true })).toBeVisible();
   await expect(page.getByText("Database", { exact: true })).toBeVisible();
 });

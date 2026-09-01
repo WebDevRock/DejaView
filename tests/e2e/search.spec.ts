@@ -28,7 +28,7 @@ test("searches exact errors with a clear source label", async ({
   });
   await expect(resultCard).toBeVisible();
   await expect(
-    resultCard.getByText("Knowledge", { exact: true }),
+    resultCard.getByText("DejaView knowledge", { exact: true }),
   ).toBeVisible();
   await expect(resultCard.getByText("Exact match")).toBeVisible();
 });
